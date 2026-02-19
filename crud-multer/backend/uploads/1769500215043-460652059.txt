@@ -1,0 +1,84 @@
+const Assignment = require('../models/Assignment');
+const fs = require("fs");
+const path = require("path");
+
+/* CREATE */
+exports.createAssignment = async (req, res) => {
+    try {
+        const assignment = new Assignment({
+            name: req.body.name,
+            todo: req.body.todo,
+            date: req.body.date,
+            file: req.file ? req.file.filename : ""
+        });
+
+        const saved = await assignment.save();
+        res.status(201).json(saved);
+    } catch (err) {
+        if (err.code === 11000) {
+            return res.status(409).json({
+                message: "Duplicate assignment not allowed"
+            });
+        }
+        res.status(500).json({ message: err.message });
+    }
+};
+
+/* READ */
+exports.getAssignments = async (req, res) => {
+    try {
+        const data = await Assignment.find().sort({ createdAt: -1 });
+        res.json(data);
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+};
+
+/* UPDATE (delete old file if new uploaded) */
+exports.updateAssignment = async (req, res) => {
+    try {
+        const assignment = await Assignment.findById(req.params.id);
+        if (!assignment) return res.status(404).json({ message: "Not found!" });
+
+        // delete old file
+        if (req.file && assignment.file) {
+            const oldPath = path.join(__dirname, "..", "uploads", assignment.file);
+            if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+        }
+
+        assignment.name = req.body.name;
+        assignment.todo = req.body.todo;
+        assignment.date = req.body.date;
+        if (req.file) assignment.file = req.file.filename;
+
+        const updated = await assignment.save();
+        res.json(updated);
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+};
+
+/* DELETE (delete file also) */
+exports.deleteAssignment = async (req, res) => {
+    try {
+        const assignment = await Assignment.findById(req.params.id);
+        if (!assignment) {
+            return res.status(404).json({ message: "Assignment not found" });
+        }
+
+        // Delete file from uploads folder
+        if (assignment.file) {
+            const filePath = path.join(__dirname, "..", "uploads", assignment.file);
+            if (fs.existsSync(filePath)) {
+                fs.unlinkSync(filePath);
+            }
+        }
+
+        // Delete MongoDB record
+        await Assignment.findByIdAndDelete(req.params.id);
+        res.json({ success: true });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: err.message });
+    }
+};

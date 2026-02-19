@@ -1,0 +1,38 @@
+I am building a React + Material UI (MUI v5) application.
+
+I uploaded an image. 
+I want the UI and behavior to be recreated EXACTLY like the screenshot.
+
+Requirements (VERY IMPORTANT):
+1. Create the SAME layout, spacing, colors, icons, alignment, and table structure as in the image.
+2. Page title: "Checkpoint Master"
+3. Top card:
+   - "Add New Checkpoint" form
+   - Fields: Checkpoint Name, Date, Add Todos (with + icon), Upload Files (Select Files button)
+   - CLEAR and SAVE CHECKPOINT buttons
+4. Bottom card:
+   - Title: "Checkpoint List (5)"
+   - Table columns:
+     S.NO | Checkpoint | Date | Todos | Actions
+   - S.NO should be circular numbered badges (1, 2, 3...)
+   - Todos should show bullet-style rows with file icons
+5. Actions column:
+   - Eye icon → View popup
+   - Pencil icon → Edit popup
+   - Delete icon → Delete confirmation
+6. Clicking View should open a MUI Dialog (popup) showing checkpoint details.
+7. Clicking Edit should open a MUI Dialog with editable form fields.
+8. Do NOT mix file preview dialog with edit/view dialog.
+9. Files upload is OPTIONAL and preview-only (NO download button).
+10. Use clean React functional components and proper state separation.
+11. Use dummy JSON data (no backend).
+12. Code should run WITHOUT ERRORS.
+
+Output format:
+- Provide FULL React component code
+- Include all necessary MUI imports
+- No pseudo code
+- No explanations
+- Only working code
+
+If anything is unclear, make a reasonable assumption and continue.

@@ -1,0 +1,1021 @@
+I'll help you create the complete Client Management system as per your requirements. Here's the implementation:
+
+## **1. App.js**
+
+```javascript
+import React from "react";
+import ReactDOM from "react-dom/client";
+import { Container } from "@mui/material";
+import ClientMaster from "./pages/ClientMaster";
+
+function App() {
+  return React.createElement(
+    Container,
+    { 
+      maxWidth: "lg", 
+      style: { 
+        marginTop: "30px", 
+        marginBottom: "30px",
+        fontFamily: "'Roboto', 'Arial', sans-serif"
+      } 
+    },
+    React.createElement(ClientMaster)
+  );
+}
+
+export default App;
+```
+
+## **2. ClientMaster.js**
+
+```javascript
+import React, { useEffect, useState } from "react";
+import ClientForm from "../components/ClientForm";
+import ClientTable from "../components/ClientTable";
+import axios from "axios";
+import { Box, Typography, Paper, CircularProgress, Alert } from "@mui/material";
+
+export default function ClientMaster() {
+  const [clients, setClients] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  const loadClients = async () => {
+    try {
+      setLoading(true);
+      const response = await axios.get("http://localhost:5000/api/clients");
+      setClients(response.data);
+      setError("");
+    } catch (err) {
+      setError("Failed to load clients. Please check server connection.");
+      console.error("Error loading clients:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadClients();
+  }, []);
+
+  return React.createElement(
+    Box,
+    null,
+    // Heading
+    React.createElement(
+      Typography,
+      {
+        variant: "h4",
+        gutterBottom: true,
+        style: {
+          fontWeight: "bold",
+          color: "#2c3e50",
+          marginBottom: "25px",
+          paddingBottom: "10px",
+          borderBottom: "2px solid #3498db"
+        }
+      },
+      "CLIENT MASTER"
+    ),
+
+    // Error Alert
+    error && React.createElement(
+      Alert,
+      {
+        severity: "error",
+        style: { marginBottom: "20px" }
+      },
+      error
+    ),
+
+    // Loading State
+    loading ? React.createElement(
+      Box,
+      {
+        display: "flex",
+        justifyContent: "center",
+        alignItems: "center",
+        height: "200px"
+      },
+      React.createElement(CircularProgress)
+    ) : React.createElement(
+      Box,
+      null,
+      // Client Form
+      React.createElement(
+        Paper,
+        {
+          elevation: 2,
+          style: {
+            padding: "20px",
+            marginBottom: "30px",
+            borderRadius: "8px",
+            backgroundColor: "#f8f9fa"
+          }
+        },
+        React.createElement(ClientForm, { refresh: loadClients })
+      ),
+
+      // Client Table
+      React.createElement(
+        Paper,
+        {
+          elevation: 2,
+          style: {
+            borderRadius: "8px",
+            overflow: "hidden"
+          }
+        },
+        React.createElement(ClientTable, { clients: clients, refresh: loadClients })
+      )
+    )
+  );
+}
+```
+
+## **3. ClientForm.js**
+
+```javascript
+import React, { useState } from "react";
+import {
+  Box,
+  TextField,
+  Button,
+  Stack,
+  IconButton,
+  InputAdornment,
+  Card,
+  CardContent,
+  Typography,
+  Chip,
+  Grid
+} from "@mui/material";
+import SaveIcon from "@mui/icons-material/Save";
+import ClearIcon from "@mui/icons-material/Clear";
+import AddIcon from "@mui/icons-material/Add";
+import DeleteIcon from "@mui/icons-material/Delete";
+import EditIcon from "@mui/icons-material/Edit";
+import axios from "axios";
+
+export default function ClientForm({ refresh }) {
+  const [name, setName] = useState("");
+  const [todoInput, setTodoInput] = useState("");
+  const [todos, setTodos] = useState([]);
+  const [editingIndex, setEditingIndex] = useState(-1);
+
+  const addTodo = () => {
+    if (todoInput.trim()) {
+      if (editingIndex >= 0) {
+        // Edit existing todo
+        const updatedTodos = [...todos];
+        updatedTodos[editingIndex] = todoInput.trim();
+        setTodos(updatedTodos);
+        setEditingIndex(-1);
+      } else {
+        // Add new todo
+        setTodos([...todos, todoInput.trim()]);
+      }
+      setTodoInput("");
+    }
+  };
+
+  const editTodo = (index) => {
+    setTodoInput(todos[index]);
+    setEditingIndex(index);
+  };
+
+  const deleteTodo = (index) => {
+    const updatedTodos = todos.filter((_, i) => i !== index);
+    setTodos(updatedTodos);
+    if (editingIndex === index) {
+      setTodoInput("");
+      setEditingIndex(-1);
+    }
+  };
+
+  const handleSave = async () => {
+    if (!name.trim()) {
+      alert("Please enter client name");
+      return;
+    }
+    if (todos.length === 0) {
+      alert("Please add at least one todo");
+      return;
+    }
+
+    try {
+      await axios.post("http://localhost:5000/api/clients", {
+        name: name.trim(),
+        todo: todos.join(", ")
+      });
+
+      // Reset form
+      setName("");
+      setTodos([]);
+      setTodoInput("");
+      setEditingIndex(-1);
+      
+      // Refresh table
+      refresh();
+      alert("Client saved successfully!");
+    } catch (err) {
+      console.error("Save error:", err);
+      alert("Failed to save client");
+    }
+  };
+
+  const handleClear = () => {
+    setName("");
+    setTodos([]);
+    setTodoInput("");
+    setEditingIndex(-1);
+  };
+
+  const handleKeyPress = (e) => {
+    if (e.key === "Enter") {
+      addTodo();
+    }
+  };
+
+  return React.createElement(
+    Box,
+    null,
+    React.createElement(
+      Grid,
+      { container: true, spacing: 3 },
+      // Left Column - Form
+      React.createElement(
+        Grid,
+        { item: true, xs: 12, md: 6 },
+        React.createElement(
+          Stack,
+          { spacing: 2 },
+          // Name Field
+          React.createElement(
+            Box,
+            null,
+            React.createElement(
+              Typography,
+              { 
+                variant: "subtitle2", 
+                style: { 
+                  marginBottom: "5px",
+                  color: "#2c3e50",
+                  fontWeight: "bold"
+                }
+              },
+              "Name *"
+            ),
+            React.createElement(TextField, {
+              placeholder: "Enter client name",
+              size: "small",
+              value: name,
+              onChange: (e) => setName(e.target.value),
+              fullWidth: true,
+              style: { backgroundColor: "white" },
+              inputProps: { style: { height: "35px" } }
+            })
+          ),
+
+          // Todo Field
+          React.createElement(
+            Box,
+            null,
+            React.createElement(
+              Typography,
+              { 
+                variant: "subtitle2", 
+                style: { 
+                  marginBottom: "5px",
+                  color: "#2c3e50",
+                  fontWeight: "bold"
+                }
+              },
+              "Todo *"
+            ),
+            React.createElement(TextField, {
+              placeholder: "Enter todo",
+              size: "small",
+              value: todoInput,
+              onChange: (e) => setTodoInput(e.target.value),
+              onKeyPress: handleKeyPress,
+              fullWidth: true,
+              style: { backgroundColor: "white", width: "300px" },
+              inputProps: { style: { height: "35px" } },
+              InputProps: {
+                endAdornment: React.createElement(
+                  InputAdornment,
+                  { position: "end" },
+                  React.createElement(
+                    IconButton,
+                    {
+                      onClick: addTodo,
+                      edge: "end",
+                      color: "primary",
+                      size: "small",
+                      disabled: !todoInput.trim(),
+                      style: { 
+                        backgroundColor: "#1976d2",
+                        color: "white",
+                        borderRadius: "4px",
+                        padding: "5px"
+                      }
+                    },
+                    React.createElement(AddIcon)
+                  )
+                )
+              }
+            })
+          ),
+
+          // Buttons
+          React.createElement(
+            Box,
+            { style: { marginTop: "15px" } },
+            React.createElement(
+              Stack,
+              { direction: "row", spacing: 2 },
+              React.createElement(
+                Button,
+                {
+                  variant: "contained",
+                  startIcon: React.createElement(SaveIcon),
+                  onClick: handleSave,
+                  disabled: !name.trim() || todos.length === 0,
+                  style: {
+                    backgroundColor: "#4CAF50",
+                    color: "white",
+                    textTransform: "none",
+                    fontWeight: "bold",
+                    padding: "8px 20px"
+                  }
+                },
+                "Save"
+              ),
+              React.createElement(
+                Button,
+                {
+                  variant: "contained",
+                  startIcon: React.createElement(ClearIcon),
+                  onClick: handleClear,
+                  style: {
+                    backgroundColor: "#f44336",
+                    color: "white",
+                    textTransform: "none",
+                    fontWeight: "bold",
+                    padding: "8px 20px"
+                  }
+                },
+                "Clear"
+              )
+            )
+          )
+        )
+      ),
+
+      // Right Column - Todo Preview
+      React.createElement(
+        Grid,
+        { item: true, xs: 12, md: 6 },
+        React.createElement(
+          Card,
+          {
+            style: {
+              backgroundColor: "#e3f2fd",
+              height: "100%",
+              border: "1px solid #bbdefb"
+            }
+          },
+          React.createElement(
+            CardContent,
+            null,
+            React.createElement(
+              Typography,
+              {
+                variant: "subtitle1",
+                style: {
+                  fontWeight: "bold",
+                  marginBottom: "15px",
+                  color: "#1565c0"
+                }
+              },
+              "Todo Preview"
+            ),
+            
+            todos.length === 0 ? 
+              React.createElement(
+                Typography,
+                {
+                  style: {
+                    color: "#757575",
+                    fontStyle: "italic",
+                    textAlign: "center",
+                    padding: "20px"
+                  }
+                },
+                "No todos added yet"
+              ) :
+              React.createElement(
+                Box,
+                { style: { maxHeight: "200px", overflowY: "auto" } },
+                todos.map((todo, index) =>
+                  React.createElement(
+                    Box,
+                    {
+                      key: index,
+                      style: {
+                        backgroundColor: "white",
+                        padding: "10px",
+                        marginBottom: "8px",
+                        borderRadius: "4px",
+                        border: "1px solid #e0e0e0",
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center"
+                      }
+                    },
+                    React.createElement(
+                      Typography,
+                      { style: { flexGrow: 1 } },
+                      `${index + 1}. ${todo}`
+                    ),
+                    React.createElement(
+                      Box,
+                      null,
+                      React.createElement(
+                        IconButton,
+                        {
+                          size: "small",
+                          onClick: () => editTodo(index),
+                          style: { marginRight: "5px" }
+                        },
+                        React.createElement(EditIcon, { fontSize: "small" })
+                      ),
+                      React.createElement(
+                        IconButton,
+                        {
+                          size: "small",
+                          onClick: () => deleteTodo(index),
+                          style: { color: "#f44336" }
+                        },
+                        React.createElement(DeleteIcon, { fontSize: "small" })
+                      )
+                    )
+                  )
+                )
+              )
+          )
+        )
+      )
+    )
+  );
+}
+```
+
+## **4. ClientTable.js**
+
+```javascript
+import React, { useState } from "react";
+import {
+  Box,
+  TextField,
+  IconButton,
+  InputAdornment,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Paper,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Button,
+  Typography
+} from "@mui/material";
+import SearchIcon from "@mui/icons-material/Search";
+import VisibilityIcon from "@mui/icons-material/Visibility";
+import EditIcon from "@mui/icons-material/Edit";
+import DeleteIcon from "@mui/icons-material/Delete";
+import axios from "axios";
+
+export default function ClientTable({ clients, refresh }) {
+  const [searchTerm, setSearchTerm] = useState("");
+  const [viewDialog, setViewDialog] = useState(false);
+  const [editDialog, setEditDialog] = useState(false);
+  const [selectedClient, setSelectedClient] = useState(null);
+  const [editName, setEditName] = useState("");
+  const [editTodo, setEditTodo] = useState("");
+
+  // Filter clients based on search
+  const filteredClients = clients.filter(client =>
+    client.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    client.todo.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const handleView = (client) => {
+    setSelectedClient(client);
+    setViewDialog(true);
+  };
+
+  const handleEdit = (client) => {
+    setSelectedClient(client);
+    setEditName(client.name);
+    setEditTodo(client.todo);
+    setEditDialog(true);
+  };
+
+  const handleDelete = async (id) => {
+    if (window.confirm("Are you sure you want to delete this client?")) {
+      try {
+        await axios.delete(`http://localhost:5000/api/clients/${id}`);
+        refresh();
+      } catch (err) {
+        console.error("Delete error:", err);
+        alert("Failed to delete client");
+      }
+    }
+  };
+
+  const handleUpdate = async () => {
+    if (!editName.trim()) {
+      alert("Please enter client name");
+      return;
+    }
+
+    try {
+      await axios.put(`http://localhost:5000/api/clients/${selectedClient._id}`, {
+        name: editName,
+        todo: editTodo
+      });
+      
+      setEditDialog(false);
+      refresh();
+      alert("Client updated successfully!");
+    } catch (err) {
+      console.error("Update error:", err);
+      alert("Failed to update client");
+    }
+  };
+
+  return React.createElement(
+    Box,
+    null,
+    // Search Bar
+    React.createElement(
+      Box,
+      {
+        style: {
+          padding: "15px",
+          backgroundColor: "#f5f5f5",
+          borderBottom: "1px solid #e0e0e0"
+        }
+      },
+      React.createElement(TextField, {
+        placeholder: "Search clients...",
+        size: "small",
+        value: searchTerm,
+        onChange: (e) => setSearchTerm(e.target.value),
+        fullWidth: true,
+        style: { backgroundColor: "white" },
+        InputProps: {
+          startAdornment: React.createElement(
+            InputAdornment,
+            { position: "start" },
+            React.createElement(SearchIcon, { color: "action" })
+          )
+        }
+      })
+    ),
+
+    // Table
+    React.createElement(
+      TableContainer,
+      null,
+      React.createElement(
+        Table,
+        null,
+        // Table Header
+        React.createElement(
+          TableHead,
+          {
+            style: {
+              backgroundColor: "#1976d2"
+            }
+          },
+          React.createElement(
+            TableRow,
+            null,
+            React.createElement(
+              TableCell,
+              {
+                style: {
+                  color: "white",
+                  fontWeight: "bold",
+                  width: "80px"
+                }
+              },
+              "S.No"
+            ),
+            React.createElement(
+              TableCell,
+              {
+                style: {
+                  color: "white",
+                  fontWeight: "bold"
+                }
+              },
+              "Name"
+            ),
+            React.createElement(
+              TableCell,
+              {
+                style: {
+                  color: "white",
+                  fontWeight: "bold"
+                }
+              },
+              "Todo"
+            ),
+            React.createElement(
+              TableCell,
+              {
+                style: {
+                  color: "white",
+                  fontWeight: "bold",
+                  width: "200px",
+                  textAlign: "center"
+                }
+              },
+              "Actions"
+            )
+          )
+        ),
+
+        // Table Body
+        React.createElement(
+          TableBody,
+          null,
+          filteredClients.length === 0 ? 
+            React.createElement(
+              TableRow,
+              null,
+              React.createElement(
+                TableCell,
+                { colSpan: 4, style: { textAlign: "center", padding: "40px" } },
+                React.createElement(
+                  Typography,
+                  { color: "textSecondary" },
+                  searchTerm ? "No clients found matching your search" : "No clients available"
+                )
+              )
+            ) :
+            filteredClients.map((client, index) =>
+              React.createElement(
+                TableRow,
+                {
+                  key: client._id,
+                  style: {
+                    backgroundColor: index % 2 === 0 ? "#fafafa" : "white"
+                  }
+                },
+                React.createElement(
+                  TableCell,
+                  null,
+                  index + 1
+                ),
+                React.createElement(
+                  TableCell,
+                  null,
+                  client.name
+                ),
+                React.createElement(
+                  TableCell,
+                  null,
+                  client.todo
+                ),
+                React.createElement(
+                  TableCell,
+                  { style: { textAlign: "center" } },
+                  React.createElement(
+                    Box,
+                    { style: { display: "flex", justifyContent: "center", gap: "8px" } },
+                    React.createElement(
+                      IconButton,
+                      {
+                        size: "small",
+                        onClick: () => handleView(client),
+                        style: {
+                          backgroundColor: "#2196f3",
+                          color: "white",
+                          padding: "6px"
+                        }
+                      },
+                      React.createElement(VisibilityIcon, { fontSize: "small" })
+                    ),
+                    React.createElement(
+                      IconButton,
+                      {
+                        size: "small",
+                        onClick: () => handleEdit(client),
+                        style: {
+                          backgroundColor: "#ff9800",
+                          color: "white",
+                          padding: "6px"
+                        }
+                      },
+                      React.createElement(EditIcon, { fontSize: "small" })
+                    ),
+                    React.createElement(
+                      IconButton,
+                      {
+                        size: "small",
+                        onClick: () => handleDelete(client._id),
+                        style: {
+                          backgroundColor: "#f44336",
+                          color: "white",
+                          padding: "6px"
+                        }
+                      },
+                      React.createElement(DeleteIcon, { fontSize: "small" })
+                    )
+                  )
+                )
+              )
+            )
+        )
+      )
+    ),
+
+    // View Dialog
+    React.createElement(
+      Dialog,
+      {
+        open: viewDialog,
+        onClose: () => setViewDialog(false),
+        maxWidth: "sm",
+        fullWidth: true
+      },
+      selectedClient && React.createElement(
+        Box,
+        null,
+        React.createElement(
+          DialogTitle,
+          {
+            style: {
+              backgroundColor: "#1976d2",
+              color: "white"
+            }
+          },
+          "View Client Details"
+        ),
+        React.createElement(
+          DialogContent,
+          { style: { padding: "20px" } },
+          React.createElement(
+            Box,
+            { style: { marginBottom: "20px" } },
+            React.createElement(
+              Typography,
+              { variant: "subtitle2", style: { color: "#666", marginBottom: "5px" } },
+              "Client Name"
+            ),
+            React.createElement(
+              Typography,
+              { variant: "body1", style: { fontWeight: "bold" } },
+              selectedClient.name
+            )
+          ),
+          React.createElement(
+            Box,
+            null,
+            React.createElement(
+              Typography,
+              { variant: "subtitle2", style: { color: "#666", marginBottom: "5px" } },
+              "Todos"
+            ),
+            React.createElement(
+              Typography,
+              { variant: "body1" },
+              selectedClient.todo
+            )
+          )
+        ),
+        React.createElement(
+          DialogActions,
+          null,
+          React.createElement(
+            Button,
+            {
+              onClick: () => setViewDialog(false),
+              style: { textTransform: "none" }
+            },
+            "Close"
+          )
+        )
+      )
+    ),
+
+    // Edit Dialog
+    React.createElement(
+      Dialog,
+      {
+        open: editDialog,
+        onClose: () => setEditDialog(false),
+        maxWidth: "sm",
+        fullWidth: true
+      },
+      selectedClient && React.createElement(
+        Box,
+        null,
+        React.createElement(
+          DialogTitle,
+          {
+            style: {
+              backgroundColor: "#ff9800",
+              color: "white"
+            }
+          },
+          "Edit Client"
+        ),
+        React.createElement(
+          DialogContent,
+          { style: { padding: "20px" } },
+          React.createElement(
+            Box,
+            { style: { marginBottom: "20px" } },
+            React.createElement(
+              Typography,
+              { variant: "subtitle2", style: { marginBottom: "5px" } },
+              "Name *"
+            ),
+            React.createElement(TextField, {
+              value: editName,
+              onChange: (e) => setEditName(e.target.value),
+              fullWidth: true,
+              size: "small"
+            })
+          ),
+          React.createElement(
+            Box,
+            null,
+            React.createElement(
+              Typography,
+              { variant: "subtitle2", style: { marginBottom: "5px" } },
+              "Todo *"
+            ),
+            React.createElement(TextField, {
+              value: editTodo,
+              onChange: (e) => setEditTodo(e.target.value),
+              fullWidth: true,
+              size: "small",
+              multiline: true,
+              rows: 3
+            })
+          )
+        ),
+        React.createElement(
+          DialogActions,
+          null,
+          React.createElement(
+            Button,
+            {
+              onClick: () => setEditDialog(false),
+              style: { textTransform: "none" }
+            },
+            "Cancel"
+          ),
+          React.createElement(
+            Button,
+            {
+              onClick: handleUpdate,
+              variant: "contained",
+              style: {
+                backgroundColor: "#4CAF50",
+                color: "white",
+                textTransform: "none"
+              }
+            },
+            "Update"
+          )
+        )
+      )
+    )
+  );
+}
+```
+
+## **5. index.js**
+
+```javascript
+import React from "react";
+import ReactDOM from "react-dom/client";
+import App from "./App";
+
+// Import Material-UI fonts
+import '@fontsource/roboto/300.css';
+import '@fontsource/roboto/400.css';
+import '@fontsource/roboto/500.css';
+import '@fontsource/roboto/700.css';
+
+const root = ReactDOM.createRoot(document.getElementById("root"));
+root.render(React.createElement(App));
+```
+
+## **6. Folder Structure**
+
+```
+src/
+├── index.js
+├── App.js
+├── pages/
+│   └── ClientMaster.js
+└── components/
+    ├── ClientForm.js
+    └── ClientTable.js
+```
+
+## **Features implemented:**
+
+✅ **+ Icon in Todo field** beside input  
+✅ **Save/Clear buttons** below name input  
+✅ **Name/Todo input width** set to 300px  
+✅ **Heading** "CLIENT MASTER"  
+✅ **Search bar** inside datagrid  
+✅ **Serial numbers** in table  
+✅ **View button** with popup dialog  
+✅ **Edit button** with popup dialog  
+✅ **Delete button**  
+✅ **Todo Preview card** with edit/delete  
+✅ **Clean layout** matching your design
+
+## **To run the application:**
+
+1. Make sure your backend server is running on `localhost:5000`
+2. Install dependencies:
+```bash
+npm install @mui/material @emotion/react @emotion/styled @mui/icons-material @fontsource/roboto axios
+```
+
+3. Start React app:
+```bash
+npm start
+```
+
+The design matches your requirements with a clean, professional interface similar to the screenshot layout.
+--------------------------------------------------------------
+
+api.js
+import axios from "axios";
+
+export default axios.create({
+  baseURL: "http://localhost:5000/api"
+});
+----------------------------------------------
+index.js
+
+ import React from "react";
+import ReactDOM from "react-dom/client";
+import App from "./App";
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+------------------------------------------------------
+
+checkpoint
+
+    import React, { useState } from "react";
+import { Stack, TextField, Button } from "@mui/material";
+import api from "../api";
+
+export default function CheckpointForm({ setRows }) {
+  const [checkpoint, setCheckpoint] = useState("");
+  const [date, setDate] = useState("");
+  const [file, setFile] = useState(null);
+
+  const submit = async () => {
+    const fd = new FormData();
+    fd.append("checkpoint", checkpoint);
+    fd.append("date", date);
+    if (file) fd.append("file", file);
+
+    const res = await api.post("/checkpoints", fd);
+    setRows(prev => [res.data, ...prev]);
+    setCheckpoint(""); setDate(""); setFile(null);
+  };
+
+  return (
+    <Stack direction="row" spacing={2} mb={2}>
+      <TextField label="Checkpoint" value={checkpoint}
+        onChange={e => setCheckpoint(e.target.value)} />
+      <TextField type="date" InputLabelProps={{ shrink: true }}
+        value={date} onChange={e => setDate(e.target.value)} />
+      <Button component="label" variant="outlined">
+        Upload
+        <input hidden type="file" onChange={e => setFile(e.target.files[0])} />
+      </Button>
+      <Button variant="contained" onClick={submit}>Save</Button>
+    </Stack>
+  );
+}

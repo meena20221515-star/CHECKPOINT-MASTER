@@ -1,0 +1,869 @@
+table
+
+  import React, { useState } from "react";
+import {
+  Box,
+  TextField,
+  IconButton,
+  InputAdornment,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Paper,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Button,
+  Typography,
+  Card,
+  CardContent,
+  List,
+  ListItem,
+  ListItemText,
+  ListItemSecondaryAction,
+  Alert,
+  Chip,
+  Divider
+} from "@mui/material";
+
+import SearchIcon from "@mui/icons-material/Search";
+import VisibilityIcon from "@mui/icons-material/Visibility";
+import EditIcon from "@mui/icons-material/Edit";
+import DeleteIcon from "@mui/icons-material/Delete";
+import AddIcon from "@mui/icons-material/Add";
+import SaveIcon from "@mui/icons-material/Save";
+import CancelIcon from "@mui/icons-material/Cancel";
+import ArrowDownwardIcon from "@mui/icons-material/ArrowDownward";
+
+import axios from "axios";
+
+export default function ClientTable({ clients, refresh }) {
+  const [searchTerm, setSearchTerm] = useState("");
+  const [viewDialog, setViewDialog] = useState(false);
+  const [editDialog, setEditDialog] = useState(false);
+  const [selectedClient, setSelectedClient] = useState(null);
+  const [message, setMessage] = useState("");
+
+  // Edit states
+  const [editName, setEditName] = useState("");
+  const [editTodosList, setEditTodosList] = useState([]);
+  const [editTodoInput, setEditTodoInput] = useState("");
+  const [editEditingIndex, setEditEditingIndex] = useState(-1);
+
+  /* -------------------- FIXED: PROPER DATA PARSING -------------------- */
+  
+  // First, let's fix how we display data in the table
+  const formatTodosForDisplay = (todoString) => {
+    if (!todoString) return [];
+    
+    // Split by comma and trim - maintain EXACT order from string
+    return todoString.split(",").map(item => item.trim()).filter(Boolean);
+  };
+
+  const filteredClients = clients.filter(c =>
+    c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    c.todo.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  /* -------------------- VIEW -------------------- */
+  const handleView = (client) => {
+    setSelectedClient(client);
+    setViewDialog(true);
+  };
+
+  /* -------------------- EDIT - FIXED: Load in CORRECT ORDER -------------------- */
+  const handleEdit = (client) => {
+    setSelectedClient(client);
+    setEditName(client.name);
+    
+    // ✅ CRITICAL FIX: Load todos in EXACT SAME ORDER as stored in database
+    const todosArray = formatTodosForDisplay(client.todo);
+    
+    console.log("=== LOADING TODOS ===");
+    console.log("Original from DB:", client.todo);
+    console.log("Parsed array:", todosArray);
+    console.log("Expected order:", todosArray.map((t, i) => `${i+1}. ${t}`).join(", "));
+    
+    // Set the list - this preserves the original order
+    setEditTodosList(todosArray);
+    
+    setEditTodoInput("");
+    setEditEditingIndex(-1);
+    setMessage(`Loaded ${todosArray.length} todos in original order`);
+    setEditDialog(true);
+  };
+
+  /* -------------------- TODO LOGIC - GUARANTEED SEQUENTIAL 1,2,3... -------------------- */
+
+  // Start editing existing todo
+  const startEditTodo = (index) => {
+    if (index >= 0 && index < editTodosList.length) {
+      setEditEditingIndex(index);
+      setEditTodoInput(editTodosList[index]);
+      setMessage(`Editing todo #${index + 1}`);
+    }
+  };
+
+  // ✅ ADD NEW TODO - ALWAYS AT BOTTOM (position n+1)
+  const addNewTodo = () => {
+    if (!editTodoInput.trim()) {
+      setMessage("Please enter todo text!");
+      return;
+    }
+    
+    const newTodo = editTodoInput.trim();
+    const newPosition = editTodosList.length + 1;
+    
+    // ✅ SIMPLE & CORRECT: Add at end of array
+    setEditTodosList(prev => {
+      const updated = [...prev, newTodo];
+      console.log(`Added "${newTodo}" at position #${newPosition}`);
+      console.log("Updated list:", updated.map((t, i) => `${i+1}. ${t}`));
+      return updated;
+    });
+    
+    setEditTodoInput("");
+    setEditEditingIndex(-1);
+    setMessage(`Added: "${newTodo}" at position #${newPosition}`);
+  };
+
+  // Save edited todo
+  const saveEditedTodo = () => {
+    if (!editTodoInput.trim() || editEditingIndex < 0) return;
+    
+    const editedTodo = editTodoInput.trim();
+    
+    setEditTodosList(prev => {
+      const updated = [...prev];
+      updated[editEditingIndex] = editedTodo;
+      return updated;
+    });
+    
+    setEditTodoInput("");
+    setEditEditingIndex(-1);
+    setMessage(`Updated todo #${editEditingIndex + 1}`);
+  };
+
+  // Cancel editing
+  const cancelEditTodo = () => {
+    setEditEditingIndex(-1);
+    setEditTodoInput("");
+    setMessage("Edit cancelled");
+  };
+
+  // Delete todo
+  const deleteTodo = (index) => {
+    if (window.confirm(`Delete todo #${index + 1}: "${editTodosList[index]}"?`)) {
+      setEditTodosList(prev => prev.filter((_, i) => i !== index));
+      
+      if (index === editEditingIndex) {
+        setEditEditingIndex(-1);
+        setEditTodoInput("");
+      }
+      
+      setMessage(`Deleted todo #${index + 1}`);
+    }
+  };
+
+  /* -------------------- UPDATE TO DATABASE - PRESERVE ORDER -------------------- */
+  const handleUpdate = async () => {
+    if (!editName.trim()) {
+      setMessage("Client name required!");
+      return;
+    }
+    
+    if (editTodosList.length === 0) {
+      setMessage("At least one todo required!");
+      return;
+    }
+
+    try {
+      setMessage("Saving...");
+      
+      // ✅ CRITICAL: Join with comma (no space after comma) for exact parsing
+      const todoString = editTodosList.join(", ");
+      
+      console.log("=== SAVING TO DATABASE ===");
+      console.log("Client:", editName);
+      console.log("Todos in order:", editTodosList.map((t, i) => `${i+1}. ${t}`));
+      console.log("Todo string:", todoString);
+      
+      await axios.put(
+        `http://localhost:5000/api/clients/${selectedClient._id}`,
+        {
+          name: editName.trim(),
+          todo: todoString
+        }
+      );
+      
+      // Show confirmation with CORRECT order
+      alert(`✅ SAVED SUCCESSFULLY!\n\nTODOS IN EXACT ORDER:\n${editTodosList.map((t, i) => `${i+1}. ${t}`).join('\n')}`);
+      
+      setEditDialog(false);
+      setMessage("");
+      refresh();
+      
+    } catch (err) {
+      console.error("Save error:", err);
+      setMessage("Error saving. Please try again.");
+    }
+  };
+
+  /* -------------------- DELETE CLIENT -------------------- */
+  const handleDelete = async (id) => {
+    if (!window.confirm("Delete this client?")) return;
+    
+    try {
+      await axios.delete(`http://localhost:5000/api/clients/${id}`);
+      refresh();
+      setMessage("Client deleted");
+    } catch (err) {
+      setMessage("Error deleting client");
+    }
+  };
+
+  /* ==================== RENDER - FIXED DISPLAY ORDER ==================== */
+  return (
+    <Box>
+      {/* SEARCH */}
+      <TextField
+        fullWidth
+        size="small"
+        placeholder="Search..."
+        value={searchTerm}
+        onChange={(e) => setSearchTerm(e.target.value)}
+        InputProps={{
+          startAdornment: (
+            <InputAdornment position="start">
+              <SearchIcon />
+            </InputAdornment>
+          )
+        }}
+        sx={{ mb: 2 }}
+      />
+
+      {/* MESSAGE */}
+      {message && (
+        <Alert severity="info" sx={{ mb: 2 }} onClose={() => setMessage("")}>
+          {message}
+        </Alert>
+      )}
+
+      {/* MAIN TABLE - DISPLAY IN CORRECT ORDER */}
+      <TableContainer component={Paper}>
+        <Table>
+          <TableHead sx={{ background: "#1976d2" }}>
+            <TableRow>
+              <TableCell sx={{ color: "#fff", width: 80 }}><strong>No.</strong></TableCell>
+              <TableCell sx={{ color: "#fff", width: 200 }}><strong>Name</strong></TableCell>
+              <TableCell sx={{ color: "#fff" }}><strong>Todo List (1,2,3... in order)</strong></TableCell>
+              <TableCell sx={{ color: "#fff", width: 150, textAlign: "center" }}><strong>Actions</strong></TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {filteredClients.map((c, i) => {
+              const todosArray = formatTodosForDisplay(c.todo);
+              
+              return (
+                <TableRow key={c._id} hover>
+                  <TableCell>
+                    <Typography fontWeight="bold">{i + 1}</Typography>
+                  </TableCell>
+                  <TableCell>
+                    <Typography>{c.name}</Typography>
+                  </TableCell>
+                  <TableCell>
+                    {/* ✅ DISPLAY IN CORRECT ORDER: 1,2,3,4,5,6 */}
+                    {todosArray.map((todo, index) => (
+                      <Box key={index} display="flex" alignItems="center" mb={0.5}>
+                        <Chip 
+                          label={index + 1}  // ✅ CORRECT: 1,2,3...
+                          size="small" 
+                          color="primary"
+                          sx={{ mr: 1, minWidth: 35, fontWeight: 'bold' }}
+                        />
+                        <Typography variant="body2">{todo}</Typography>
+                      </Box>
+                    ))}
+                  </TableCell>
+                  <TableCell align="center">
+                    <IconButton onClick={() => handleView(c)} color="primary" size="small">
+                      <VisibilityIcon fontSize="small" />
+                    </IconButton>
+                    <IconButton onClick={() => handleEdit(c)} color="warning" size="small">
+                      <EditIcon fontSize="small" />
+                    </IconButton>
+                    <IconButton onClick={() => handleDelete(c._id)} color="error" size="small">
+                      <DeleteIcon fontSize="small" />
+                    </IconButton>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+      </TableContainer>
+
+      {/* VIEW DIALOG */}
+      <Dialog open={viewDialog} onClose={() => setViewDialog(false)} maxWidth="sm">
+        <DialogTitle>Client Details</DialogTitle>
+        <DialogContent>
+          {selectedClient && (
+            <Box>
+              <Typography variant="h6" gutterBottom color="primary">
+                {selectedClient.name}
+              </Typography>
+              <Divider sx={{ my: 2 }} />
+              
+              <Typography variant="subtitle1" gutterBottom fontWeight="bold">
+                Todos (in exact saved order):
+              </Typography>
+              
+              <List dense>
+                {formatTodosForDisplay(selectedClient.todo).map((todo, index) => (
+                  <ListItem key={index}>
+                    <ListItemText 
+                      primary={
+                        <Box display="flex" alignItems="center">
+                          <Typography 
+                            sx={{ 
+                              minWidth: 40,
+                              fontWeight: 'bold',
+                              color: 'primary.main'
+                            }}
+                          >
+                            {index + 1}. {/* ✅ CORRECT ORDER */}
+                          </Typography>
+                          <Typography sx={{ ml: 1 }}>{todo}</Typography>
+                        </Box>
+                      }
+                    />
+                  </ListItem>
+                ))}
+              </List>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setViewDialog(false)}>Close</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* EDIT DIALOG - MAIN FIX */}
+      <Dialog open={editDialog} fullWidth maxWidth="md" onClose={() => setEditDialog(false)}>
+        <DialogTitle>
+          <Box>
+            <Typography variant="h6">Edit Client</Typography>
+            <Typography variant="body2" color="primary" sx={{ mt: 0.5 }}>
+              ✅ New todos ALWAYS added at position #{editTodosList.length + 1}
+            </Typography>
+          </Box>
+        </DialogTitle>
+        
+        <DialogContent>
+          {/* Client Name */}
+          <TextField
+            label="Client Name"
+            fullWidth
+            value={editName}
+            onChange={(e) => setEditName(e.target.value)}
+            sx={{ mb: 3 }}
+            size="small"
+          />
+
+          {/* ORDER GUARANTEE */}
+          <Alert severity="success" sx={{ mb: 2 }}>
+            <Typography variant="body2">
+              <strong>GUARANTEED SEQUENTIAL ORDER:</strong> Todos will always be saved as 1,2,3,4,5,6...
+            </Typography>
+          </Alert>
+
+          {/* TODO INPUT */}
+          <Box display="flex" gap={1} mb={3}>
+            <TextField
+              fullWidth
+              size="small"
+              placeholder={
+                editEditingIndex >= 0 
+                  ? `Editing todo #${editEditingIndex + 1}`
+                  : `Type new todo → Will be #${editTodosList.length + 1}`
+              }
+              value={editTodoInput}
+              onChange={(e) => setEditTodoInput(e.target.value)}
+              onKeyPress={(e) => {
+                if (e.key === 'Enter') {
+                  editEditingIndex >= 0 ? saveEditedTodo() : addNewTodo();
+                }
+              }}
+              autoFocus
+            />
+            {editEditingIndex >= 0 ? (
+              <Box display="flex" gap={1}>
+                <Button
+                  variant="contained"
+                  color="success"
+                  onClick={saveEditedTodo}
+                  disabled={!editTodoInput.trim()}
+                  startIcon={<SaveIcon />}
+                >
+                  Save
+                </Button>
+                <Button
+                  variant="outlined"
+                  onClick={cancelEditTodo}
+                  startIcon={<CancelIcon />}
+                >
+                  Cancel
+                </Button>
+              </Box>
+            ) : (
+              <Button
+                variant="contained"
+                onClick={addNewTodo}
+                disabled={!editTodoInput.trim()}
+                startIcon={<AddIcon />}
+              >
+                Add (#{editTodosList.length + 1})
+              </Button>
+            )}
+          </Box>
+
+          {/* CURRENT TODOS - SHOWING CORRECT ORDER */}
+          <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
+            Current Todos (in order {editTodosList.length > 0 ? `1 → ${editTodosList.length}` : 'none'}):
+          </Typography>
+          
+          {editTodosList.length === 0 ? (
+            <Alert severity="warning">
+              No todos yet. Add your first todo above.
+            </Alert>
+          ) : (
+            <Card variant="outlined">
+              <CardContent sx={{ p: 2 }}>
+                <List dense>
+                  {editTodosList.map((todo, index) => (
+                    <ListItem 
+                      key={index}
+                      sx={{ 
+                        borderBottom: index < editTodosList.length - 1 ? '1px solid #eee' : 'none',
+                        bgcolor: index === editEditingIndex ? '#fff8e1' : 'transparent',
+                        py: 1.5
+                      }}
+                    >
+                      <ListItemText 
+                        primary={
+                          <Box display="flex" alignItems="center" gap={2}>
+                            <Chip 
+                              label={index + 1}  // ✅ CORRECT: 1,2,3,4,5,6
+                              color={index === editEditingIndex ? "warning" : "primary"}
+                              sx={{ fontWeight: 'bold', minWidth: 40 }}
+                            />
+                            <Typography>{todo}</Typography>
+                            {index === editTodosList.length - 1 && (
+                              <Chip 
+                                label="LAST" 
+                                size="small" 
+                                color="success" 
+                                variant="outlined"
+                              />
+                            )}
+                          </Box>
+                        }
+                      />
+                      <ListItemSecondaryAction>
+                        <IconButton 
+                          size="small" 
+                          onClick={() => startEditTodo(index)}
+                          color="primary"
+                          sx={{ mr: 1 }}
+                        >
+                          <EditIcon fontSize="small" />
+                        </IconButton>
+                        <IconButton 
+                          size="small" 
+                          onClick={() => deleteTodo(index)}
+                          color="error"
+                        >
+                          <DeleteIcon fontSize="small" />
+                        </IconButton>
+                      </ListItemSecondaryAction>
+                    </ListItem>
+                  ))}
+                </List>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* ORDER VERIFICATION */}
+          {editTodosList.length > 0 && (
+            <Box sx={{ mt: 3, p: 2, bgcolor: '#e8f5e9', borderRadius: 1, border: '1px solid #c8e6c9' }}>
+              <Typography variant="subtitle2" fontWeight="bold" gutterBottom color="success.main">
+                ✅ ORDER VERIFICATION (Will be saved exactly like this):
+              </Typography>
+              {editTodosList.map((todo, i) => (
+                <Typography key={i} variant="body2" sx={{ ml: 2, mb: 0.5 }}>
+                  <strong>{i + 1}.</strong> {todo}
+                </Typography>
+              ))}
+            </Box>
+          )}
+        </DialogContent>
+
+        <DialogActions>
+          <Button onClick={() => setEditDialog(false)} variant="outlined">
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleUpdate} 
+            variant="contained" 
+            color="success"
+            disabled={editTodosList.length === 0 || !editName.trim()}
+            startIcon={<SaveIcon />}
+          >
+            Save Exact Order
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </Box>
+  );
+}
+---------------------------------------------------------------------
+db.js
+
+ const mongoose = require("mongoose");
+
+const connectDB = async () => {
+  try {
+    await mongoose.connect("mongodb://127.0.0.1:27017/clientdb", {
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+    });
+    console.log("✅ MongoDB Connected");
+  } catch (error) {
+    console.error("❌ MongoDB Error:", error);
+    process.exit(1);
+  }
+};
+
+module.exports = connectDB;
+----------------------------------------------------------
+client controller.js
+const Client = require("../models/Client");
+
+/* ---------------- GET ALL (ORDER FIXED) ---------------- */
+exports.getClients = async (req, res) => {
+  try {
+    const clients = await Client.find()
+      .sort({ createdAt: 1 }); // ✅ OLDEST → NEWEST
+
+    res.status(200).json(clients);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+/* ---------------- CREATE ---------------- */
+exports.createClient = async (req, res) => {
+  try {
+    const client = new Client(req.body);
+    const saved = await client.save();
+    res.status(201).json(saved);
+  } catch (err) {
+    res.status(400).json({ message: err.message });
+  }
+};
+
+/* ---------------- UPDATE ---------------- */
+exports.updateClient = async (req, res) => {
+  try {
+    const updated = await Client.findByIdAndUpdate(
+      req.params.id,
+      req.body,
+      { new: true }
+    );
+    res.json(updated);
+  } catch (err) {
+    res.status(400).json({ message: err.message });
+  }
+};
+
+/* ---------------- DELETE ---------------- */
+exports.deleteClient = async (req, res) => {
+  try {
+    await Client.findByIdAndDelete(req.params.id);
+    res.json({ message: "Deleted successfully" });
+  } catch (err) {
+    res.status(400).json({ message: err.message });
+  }
+};
+----------------------------------------------
+client.js
+
+ const mongoose = require("mongoose");
+
+const clientSchema = new mongoose.Schema({
+  name: {
+    type: String,
+    required: true,
+    trim: true
+  },
+  todo: {
+    type: String,
+    required: true
+  },
+  sequence: {
+    type: Number,
+    required: true,
+    index: true
+  }
+});
+
+module.exports = mongoose.model("Client", clientSchema);
+-------------------------------------------------
+routes
+
+const express = require("express");
+const router = express.Router();
+const controller = require("../controllers/clientController");
+
+router.get("/", controller.getClients);
+router.post("/", controller.createClient);
+router.put("/:id", controller.updateClient);
+router.delete("/:id", controller.deleteClient);
+
+module.exports = router;
+-------------------------------------------
+
+server.js
+
+const express = require("express");
+const mongoose = require("mongoose");
+const cors = require("cors");
+
+const app = express();
+
+app.use(cors());
+app.use(express.json());
+
+mongoose.connect("mongodb://127.0.0.1:27017/clientdb")
+  .then(() => console.log("MongoDB connected"))
+  .catch(err => console.log(err));
+
+app.use("/api/clients", require("./routes/clientRoutes"));
+
+app.listen(5000, () => {
+  console.log("Server running on port 5000");
+});
+------------------------------------------
+serchbar
+
+import React from "react";
+import { TextField } from "@mui/material";
+
+export default function SearchBar({ search, setSearch }) {
+  return (
+    <TextField
+      label="Search..."
+      size="small"
+      value={search}
+      onChange={(e) => setSearch(e.target.value)}
+      sx={{ width: 300 }}
+    />
+  );
+}
+-------------------------------------------
+add clients
+
+import React, { useState } from 'react';
+import { Container, Typography, Button, Box, TextField } from '@mui/material';
+import { useNavigate } from 'react-router-dom';
+import axios from 'axios';
+
+export default function AddClient() {
+  const [name, setName] = useState('');
+  const [todo, setTodo] = useState('');
+  const navigate = useNavigate();
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      await axios.post('http://localhost:5000/api/clients', {
+        name,
+        todo
+      });
+      navigate('/');
+    } catch (error) {
+      console.error('Error adding client:', error);
+      alert('Failed to add client: ' + error.message);
+    }
+  };
+
+  return (
+    <Container maxWidth="sm" sx={{ mt: 4 }}>
+      <Typography variant="h4" gutterBottom>
+        Add New Client
+      </Typography>
+      
+      <Box component="form" onSubmit={handleSubmit}>
+        <Box mb={3}>
+          <TextField
+            label="Name *"
+            fullWidth
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            required
+          />
+        </Box>
+        
+        <Box mb={3}>
+          <TextField
+            label="Todo *"
+            fullWidth
+            multiline
+            rows={4}
+            value={todo}
+            onChange={(e) => setTodo(e.target.value)}
+            required
+          />
+        </Box>
+        
+        <Box display="flex" gap={2}>
+          <Button type="submit" variant="contained">
+            Submit
+          </Button>
+          <Button variant="outlined" onClick={() => navigate('/')}>
+            Cancel
+          </Button>
+        </Box>
+      </Box>
+    </Container>
+  );
+}
+--------------------------------------------------
+
+
+CLIENTAPI.JS
+
+let clients = [
+  { id: 1, name: 'Meena', todo: 'I am developer' }
+];
+
+export const getClients = () => clients;
+export const addClient = (data) => clients.push({ id: Date.now(), ...data });
+export const updateClient = (id, data) => {
+  clients = clients.map(c => c.id === id ? { ...c, ...data } : c);
+};
+export const deleteClient = (id) => {
+  clients = clients.filter(c => c.id !== id);
+};
+------------------------------------------------------------
+
+
+import React, { useEffect, useState } from "react";
+import ClientForm from "../components/ClientForm";
+import ClientTable from "../components/ClientTable";
+import axios from "axios";
+import { Box, Typography, Paper, CircularProgress, Alert } from "@mui/material";
+
+export default function ClientMaster() {
+  const [clients, setClients] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  const loadClients = async () => {
+    try {
+      setLoading(true);
+      const response = await axios.get("http://localhost:5000/api/clients");
+      setClients(response.data);
+      setError("");
+    } catch (err) {
+      setError("Failed to load clients. Please check server connection.");
+      console.error("Error loading clients:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadClients();
+  }, []);
+
+  return React.createElement(
+    Box,
+    null,
+    // Heading
+    React.createElement(
+      Typography,
+      {
+        variant: "h4",
+        gutterBottom: true,
+        style: {
+          fontWeight: "bold",
+          color: "#2c3e50",
+          marginBottom: "25px",
+          paddingBottom: "10px",
+          borderBottom: "2px solid #3498db"
+        }
+      },
+      "CLIENT MASTER"
+    ),
+
+    // Error Alert
+    error && React.createElement(
+      Alert,
+      {
+        severity: "error",
+        style: { marginBottom: "20px" }
+      },
+      error
+    ),
+
+    // Loading State
+    loading ? React.createElement(
+      Box,
+      {
+        display: "flex",
+        justifyContent: "center",
+        alignItems: "center",
+        height: "200px"
+      },
+      React.createElement(CircularProgress)
+    ) : React.createElement(
+      Box,
+      null,
+      // Client Form
+      React.createElement(
+        Paper,
+        {
+          elevation: 2,
+          style: {
+            padding: "20px",
+            marginBottom: "30px",
+            borderRadius: "8px",
+            backgroundColor: "#f8f9fa"
+          }
+        },
+        React.createElement(ClientForm, { refresh: loadClients })
+      ),
+
+      // Client Table
+      React.createElement(
+        Paper,
+        {
+          elevation: 2,
+          style: {
+            borderRadius: "8px",
+            overflow: "hidden"
+          }
+        },
+        React.createElement(ClientTable, { clients: clients, refresh: loadClients })
+      )
+    )
+  );
+}
+-------------------------------------
+

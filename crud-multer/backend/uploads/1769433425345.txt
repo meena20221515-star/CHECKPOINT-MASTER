@@ -1,0 +1,1366 @@
+import React, { useState } from "react";
+import {
+  Box,
+  Typography,
+  Tooltip,
+  Alert,
+  IconButton,
+  Chip,
+  Stack,
+  Paper,
+  TablePagination,
+  Avatar
+} from "@mui/material";
+import {
+  Visibility as ViewIcon,
+  Edit as EditIcon,
+  Delete as DeleteIcon,
+  CheckCircle as CheckCircleIcon,
+  RadioButtonUnchecked as UncheckedIcon,
+  Attachment as AttachmentIcon,
+  KeyboardArrowLeft,
+  KeyboardArrowRight,
+  FirstPage as FirstPageIcon,
+  LastPage as LastPageIcon
+} from "@mui/icons-material";
+import { useTheme } from "@mui/material/styles";
+
+function TablePaginationActions(props) {
+  const theme = useTheme();
+  const { count, page, rowsPerPage, onPageChange } = props;
+
+  const handleFirstPageButtonClick = (event) => {
+    onPageChange(event, 0);
+  };
+
+  const handleBackButtonClick = (event) => {
+    onPageChange(event, page - 1);
+  };
+
+  const handleNextButtonClick = (event) => {
+    onPageChange(event, page + 1);
+  };
+
+  const handleLastPageButtonClick = (event) => {
+    onPageChange(event, Math.max(0, Math.ceil(count / rowsPerPage) - 1));
+  };
+
+  return (
+    <Box sx={{ flexShrink: 0, ml: 2.5 }}>
+      <IconButton
+        onClick={handleFirstPageButtonClick}
+        disabled={page === 0}
+        aria-label="first page"
+      >
+        {theme.direction === 'rtl' ? <LastPageIcon /> : <FirstPageIcon />}
+      </IconButton>
+      <IconButton
+        onClick={handleBackButtonClick}
+        disabled={page === 0}
+        aria-label="previous page"
+      >
+        {theme.direction === 'rtl' ? <KeyboardArrowRight /> : <KeyboardArrowLeft />}
+      </IconButton>
+      <IconButton
+        onClick={handleNextButtonClick}
+        disabled={page >= Math.ceil(count / rowsPerPage) - 1}
+        aria-label="next page"
+      >
+        {theme.direction === 'rtl' ? <KeyboardArrowLeft /> : <KeyboardArrowRight />}
+      </IconButton>
+      <IconButton
+        onClick={handleLastPageButtonClick}
+        disabled={page >= Math.ceil(count / rowsPerPage) - 1}
+        aria-label="last page"
+      >
+        {theme.direction === 'rtl' ? <FirstPageIcon /> : <LastPageIcon />}
+      </IconButton>
+    </Box>
+  );
+}
+
+export default function CheckpointTable({ checkpoints, onDelete, onView, onEdit }) {
+  const [page, setPage] = React.useState(0);
+  const [rowsPerPage, setRowsPerPage] = React.useState(5);
+
+  const formatDate = (dateString) => {
+    if (!dateString) return "N/A";
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric"
+      });
+    } catch (error) {
+      return "Invalid Date";
+    }
+  };
+
+  const handleChangePage = (event, newPage) => {
+    setPage(newPage);
+  };
+
+  const handleChangeRowsPerPage = (event) => {
+    setRowsPerPage(parseInt(event.target.value, 10));
+    setPage(0);
+  };
+
+  // Sort checkpoints by creation date (newest first) for proper sequential order
+  const sortedCheckpoints = [...checkpoints].sort((a, b) => {
+    const dateA = new Date(a.createdAt || a.date || 0);
+    const dateB = new Date(b.createdAt || b.date || 0);
+    return dateB - dateA; // Newest first
+  });
+
+  // Calculate paginated data
+  const startIndex = page * rowsPerPage;
+  const endIndex = startIndex + rowsPerPage;
+  const paginatedCheckpoints = sortedCheckpoints.slice(startIndex, endIndex);
+
+  // Calculate total sequential number for display
+  const getSequentialNumber = (index) => {
+    return startIndex + index + 1;
+  };
+
+  if (sortedCheckpoints.length === 0) {
+    return (
+      <Alert severity="info" sx={{ mt: 2 }}>
+        No checkpoints found. Create your first checkpoint above!
+      </Alert>
+    );
+  }
+
+  return (
+    <Paper elevation={0} sx={{ 
+      border: "1px solid #e0e0e0",
+      borderRadius: 1,
+      mt: 2,
+      overflow: "hidden"
+    }}>
+      {/* DataGrid Style Table */}
+      <Box sx={{ width: "100%", overflow: "hidden" }}>
+        {/* Table Header */}
+        <Box sx={{ 
+          display: "flex",
+          bgcolor: "#f5f5f5",
+          borderBottom: "1px solid #e0e0e0",
+          py: 1.5,
+          px: 2,
+          fontWeight: "bold",
+          fontSize: "0.875rem"
+        }}>
+          <Box sx={{ width: 60, flexShrink: 0, textAlign: "center" }}>S.NO</Box>
+          <Box sx={{ flex: 2, pl: 1 }}>Checkpoint</Box>
+          <Box sx={{ width: 120, flexShrink: 0 }}>Date</Box>
+          <Box sx={{ flex: 2 }}>Todos</Box>
+          <Box sx={{ width: 100, flexShrink: 0, textAlign: "center" }}>Files</Box>
+          <Box sx={{ width: 180, flexShrink: 0, textAlign: "center" }}>Actions</Box>
+        </Box>
+
+        {/* Table Body - Sequential Order 1,2,3 */}
+        {paginatedCheckpoints.map((cp, index) => {
+          const sequentialNumber = getSequentialNumber(index);
+          const circleNumber = String.fromCharCode(0x245F + sequentialNumber); // ①, ②, ③ etc
+          
+          return (
+            <Box 
+              key={cp._id || index} 
+              sx={{ 
+                display: "flex",
+                borderBottom: "1px solid #e0e0e0",
+                py: 2,
+                px: 2,
+                alignItems: "center",
+                minHeight: "70px",
+                "&:hover": { bgcolor: '#fafafa' }
+              }}
+            >
+              {/* Serial Number - Sequential ①, ②, ③ */}
+              <Box sx={{ 
+                width: 60, 
+                flexShrink: 0, 
+                textAlign: "center",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center"
+              }}>
+                <Avatar
+                  sx={{
+                    width: 32,
+                    height: 32,
+                    bgcolor: "#1976d2",
+                    fontSize: "1rem",
+                    fontWeight: "bold",
+                    marginBottom: 0.5
+                  }}
+                >
+                  {circleNumber}
+                </Avatar>
+                <Typography variant="caption" color="text.secondary">
+                  {sequentialNumber}
+                </Typography>
+              </Box>
+
+              {/* Checkpoint Name */}
+              <Box sx={{ flex: 2, pr: 2, pl: 1 }}>
+                <Typography variant="subtitle1" fontWeight="medium" sx={{ fontSize: "0.95rem" }}>
+                  {cp.checkpoint || "Unnamed"}
+                </Typography>
+                <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.5 }}>
+                  ID: {cp._id ? cp._id.substring(0, 8) + "..." : "N/A"}
+                </Typography>
+              </Box>
+
+              {/* Date */}
+              <Box sx={{ width: 120, flexShrink: 0 }}>
+                <Typography variant="body2" sx={{ fontSize: "0.875rem" }}>
+                  {formatDate(cp.date)}
+                </Typography>
+              </Box>
+
+              {/* Todos */}
+              <Box sx={{ flex: 2, pr: 2 }}>
+                <Stack spacing={0.5}>
+                  {cp.todos && cp.todos.slice(0, 2).map((todo, i) => (
+                    <Box key={i} sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                      {i % 2 === 0 ? (
+                        <CheckCircleIcon fontSize="small" color="success" />
+                      ) : (
+                        <UncheckedIcon fontSize="small" color="action" />
+                      )}
+                      <Typography variant="body2" sx={{ fontSize: "0.875rem" }} noWrap>
+                        {todo}
+                      </Typography>
+                    </Box>
+                  ))}
+                  {cp.todos && cp.todos.length > 2 && (
+                    <Typography variant="caption" color="text.secondary">
+                      +{cp.todos.length - 2} more
+                    </Typography>
+                  )}
+                  {(!cp.todos || cp.todos.length === 0) && (
+                    <Typography variant="caption" color="text.secondary">
+                      No todos
+                    </Typography>
+                  )}
+                </Stack>
+              </Box>
+
+              {/* Files Column */}
+              <Box sx={{ width: 100, flexShrink: 0, textAlign: "center" }}>
+                <Stack direction="row" spacing={0.5} alignItems="center" justifyContent="center">
+                  {cp.files && cp.files.length > 0 ? (
+                    <>
+                      <AttachmentIcon fontSize="small" color="action" />
+                      <Typography variant="caption" color="text.secondary">
+                        {cp.files.length}
+                      </Typography>
+                    </>
+                  ) : (
+                    <Typography variant="caption" color="text.secondary">
+                      -
+                    </Typography>
+                  )}
+                </Stack>
+              </Box>
+
+              {/* Actions */}
+              <Box sx={{ width: 180, flexShrink: 0, textAlign: "center" }}>
+                <Stack direction="row" spacing={1} justifyContent="center">
+                  <Tooltip title="View Details">
+                    <IconButton
+                      size="small"
+                      sx={{ 
+                        bgcolor: "#e3f2fd",
+                        '&:hover': { bgcolor: "#bbdefb" },
+                        color: "#1976d2"
+                      }}
+                      onClick={() => onView(cp._id)}
+                    >
+                      <ViewIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
+
+                  <Tooltip title="Edit">
+                    <IconButton
+                      size="small"
+                      sx={{ 
+                        bgcolor: "#fff8e1",
+                        '&:hover': { bgcolor: "#ffecb3" },
+                        color: "#ff9800"
+                      }}
+                      onClick={() => onEdit(cp._id)}
+                    >
+                      <EditIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
+
+                  <Tooltip title="Delete">
+                    <IconButton
+                      size="small"
+                      sx={{ 
+                        bgcolor: "#ffebee",
+                        '&:hover': { bgcolor: "#ffcdd2" },
+                        color: "#f44336"
+                      }}
+                      onClick={() => onDelete(cp._id)}
+                    >
+                      <DeleteIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
+                </Stack>
+                <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.5 }}>
+                  Seq: {sequentialNumber}
+                </Typography>
+              </Box>
+            </Box>
+          );
+        })}
+      </Box>
+
+      {/* Pagination */}
+      <TablePagination
+        rowsPerPageOptions={[5, 10, 25]}
+        component="div"
+        count={sortedCheckpoints.length}
+        rowsPerPage={rowsPerPage}
+        page={page}
+        onPageChange={handleChangePage}
+        onRowsPerPageChange={handleChangeRowsPerPage}
+        ActionsComponent={TablePaginationActions}
+        labelRowsPerPage="Rows per page:"
+        labelDisplayedRows={({ from, to, count }) => 
+          `Showing ${from}-${to} of ${count} (Sequential: ${from}-${to})`
+        }
+        sx={{
+          borderTop: "1px solid #e0e0e0",
+          "& .MuiTablePagination-toolbar": {
+            minHeight: "52px",
+            fontSize: "0.875rem"
+          }
+        }}
+      />
+    </Paper>
+  );
+}
+
+table.js
+-----------------------------------------------------
+
+   import React, { useState, useEffect } from "react";
+import {
+  Container,
+  Paper,
+  Typography,
+  Box,
+  Alert,
+  Snackbar,
+  LinearProgress,
+  Divider,
+  Grid,
+  Chip
+} from "@mui/material";
+import CheckpointForm from "./components/CheckpointForm";
+import CheckpointTable from "./components/CheckpointTable";
+import CheckpointDialog from "./components/CheckpointDialog";
+import axios from "axios";
+
+function App() {
+  const [checkpoints, setCheckpoints] = useState([]);
+  const [message, setMessage] = useState({ type: "", text: "" });
+  const [openDialog, setOpenDialog] = useState(false);
+  const [selectedCheckpoint, setSelectedCheckpoint] = useState(null);
+  const [dialogMode, setDialogMode] = useState("view");
+  const [loading, setLoading] = useState(false);
+
+  const fetchCheckpoints = async () => {
+    setLoading(true);
+    try {
+      const res = await axios.get("http://localhost:5000/api/checkpoints");
+      // Sort by creation date for sequential order
+      const sortedData = res.data.sort((a, b) => 
+        new Date(b.createdAt || b.date) - new Date(a.createdAt || a.date)
+      );
+      setCheckpoints(sortedData);
+    } catch (err) {
+      showMessage("error", "Failed to fetch checkpoints");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchCheckpoints();
+    
+    // Listen for switch to edit mode
+    const handleSwitchToEdit = (e) => {
+      if (e.detail) {
+        handleEdit(e.detail);
+      }
+    };
+    
+    window.addEventListener("switchToEdit", handleSwitchToEdit);
+    return () => window.removeEventListener("switchToEdit", handleSwitchToEdit);
+  }, []);
+
+  const showMessage = (type, text) => {
+    setMessage({ type, text });
+    setTimeout(() => setMessage({ type: "", text: "" }), 3000);
+  };
+
+  const handleCheckpointSubmit = (newCheckpoint) => {
+    // Add new checkpoint at the beginning for sequential order
+    setCheckpoints([newCheckpoint, ...checkpoints]);
+    showMessage("success", "Checkpoint saved successfully!");
+  };
+
+  const handleDelete = async (id) => {
+    if (!window.confirm("Are you sure you want to delete this checkpoint?")) {
+      return;
+    }
+    
+    try {
+      await axios.delete(`http://localhost:5000/api/checkpoints/${id}`);
+      setCheckpoints(checkpoints.filter(cp => cp._id !== id));
+      showMessage("success", "Checkpoint deleted successfully!");
+    } catch (err) {
+      showMessage("error", "Failed to delete checkpoint");
+    }
+  };
+
+  const handleView = async (id) => {
+    try {
+      const res = await axios.get(`http://localhost:5000/api/checkpoints/${id}`);
+      setSelectedCheckpoint(res.data);
+      setDialogMode("view");
+      setOpenDialog(true);
+    } catch (err) {
+      showMessage("error", "Failed to load checkpoint details");
+    }
+  };
+
+  const handleEdit = async (id) => {
+    try {
+      const res = await axios.get(`http://localhost:5000/api/checkpoints/${id}`);
+      setSelectedCheckpoint(res.data);
+      setDialogMode("edit");
+      setOpenDialog(true);
+    } catch (err) {
+      showMessage("error", "Failed to load checkpoint for editing");
+    }
+  };
+
+  const handleDialogClose = () => {
+    setOpenDialog(false);
+    setSelectedCheckpoint(null);
+  };
+
+  const handleUpdate = (updatedCheckpoint) => {
+    // Update checkpoint and maintain sequential order
+    setCheckpoints(checkpoints.map(cp => 
+      cp._id === updatedCheckpoint._id ? updatedCheckpoint : cp
+    ));
+    setOpenDialog(false);
+    showMessage("success", "Checkpoint updated successfully!");
+  };
+
+  return (
+    <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+      {/* Main Title */}
+      <Grid container alignItems="center" justifyContent="space-between" sx={{ mb: 4 }}>
+        <Grid item>
+          <Typography 
+            variant="h4" 
+            sx={{ 
+              fontWeight: "bold",
+              color: "#333"
+            }}
+          >
+            📋 Checkpoint Master
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            Manage your checkpoints sequentially
+          </Typography>
+        </Grid>
+        <Grid item>
+          <Chip 
+            label={`${checkpoints.length} Checkpoints`} 
+            color="primary" 
+            variant="outlined"
+          />
+        </Grid>
+      </Grid>
+
+      {message.text && (
+        <Snackbar 
+          open={!!message.text} 
+          autoHideDuration={3000}
+          onClose={() => setMessage({ type: "", text: "" })}
+          anchorOrigin={{ vertical: "top", horizontal: "right" }}
+        >
+          <Alert severity={message.type} sx={{ width: "100%" }}>
+            {message.text}
+          </Alert>
+        </Snackbar>
+      )}
+
+      {/* Add New Checkpoint Section */}
+      <Paper elevation={1} sx={{ p: 3, mb: 4, border: "1px solid #e0e0e0" }}>
+        <Typography 
+          variant="h6" 
+          gutterBottom 
+          sx={{ 
+            fontWeight: "bold",
+            mb: 3,
+            color: "#333"
+          }}
+        >
+          Add New Checkpoint
+        </Typography>
+        
+        <CheckpointForm 
+          onSubmit={handleCheckpointSubmit} 
+          onRefresh={fetchCheckpoints}
+        />
+      </Paper>
+
+      <Divider sx={{ my: 4 }} />
+
+      {/* Checkpoint List Section */}
+      <Box>
+        <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 2 }}>
+          <Typography 
+            variant="h6" 
+            sx={{ 
+              fontWeight: "bold",
+              color: "#333"
+            }}
+          >
+            Checkpoint List - Sequential Order ({checkpoints.length})
+          </Typography>
+          <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
+            <Chip 
+              icon={<span>①</span>}
+              label="Sequential" 
+              variant="outlined"
+              color="primary"
+              size="small"
+            />
+            <Chip 
+              icon={<span>🔄</span>}
+              label="Refresh" 
+              variant="outlined"
+              onClick={fetchCheckpoints}
+              sx={{ cursor: "pointer" }}
+            />
+          </Box>
+        </Box>
+        
+        {loading ? (
+          <Box sx={{ textAlign: "center", py: 4 }}>
+            <LinearProgress sx={{ mb: 2 }} />
+            <Typography>Loading checkpoints...</Typography>
+          </Box>
+        ) : (
+          <CheckpointTable 
+            checkpoints={checkpoints} 
+            onDelete={handleDelete}
+            onView={handleView}
+            onEdit={handleEdit}
+          />
+        )}
+      </Box>
+
+      {/* View/Edit Dialog */}
+      {selectedCheckpoint && (
+        <CheckpointDialog
+          open={openDialog}
+          mode={dialogMode}
+          checkpoint={selectedCheckpoint}
+          onClose={handleDialogClose}
+          onUpdate={handleUpdate}
+        />
+      )}
+    </Container>
+  );
+}
+
+export default App;
+--------------------------------------------
+dialog
+
+import React, { useState, useEffect } from "react";
+import {
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Button,
+  TextField,
+  IconButton,
+  Stack,
+  Box,
+  Typography,
+  Paper,
+  Grid,
+  Divider,
+  Tooltip,
+  LinearProgress,
+  Card,
+  CardContent,
+  CardActions,
+  InputAdornment,
+  Chip
+} from "@mui/material";
+import {
+  Close as CloseIcon,
+  Save as SaveIcon,
+  Edit as EditIcon,
+  Delete as DeleteIcon,
+  AddCircle as AddCircleIcon,
+  Attachment as AttachmentIcon,
+  Download as DownloadIcon,
+  Cancel as CancelIcon,
+  Visibility as ViewIcon,
+  CheckCircle as CheckCircleIcon,
+  RadioButtonUnchecked as UncheckedIcon,
+  EditNote as EditNoteIcon,
+  VisibilityOutlined as ViewOutlinedIcon,
+  DeleteOutline as DeleteOutlineIcon,
+  Upload as UploadIcon,
+  MoreVert as MoreVertIcon,
+  Check as CheckIcon
+} from "@mui/icons-material";
+import axios from "axios";
+
+export default function CheckpointDialog({ open, mode, checkpoint, onClose, onUpdate }) {
+  const [editData, setEditData] = useState({
+    checkpoint: "",
+    date: "",
+    todos: [],
+    files: []
+  });
+  const [todoInput, setTodoInput] = useState("");
+  const [newFiles, setNewFiles] = useState([]);
+  const [existingFiles, setExistingFiles] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [editingTodoIndex, setEditingTodoIndex] = useState(-1);
+  const [editTodoText, setEditTodoText] = useState("");
+
+  // Initialize data when dialog opens
+  useEffect(() => {
+    if (checkpoint && open) {
+      setEditData({
+        checkpoint: checkpoint.checkpoint || "",
+        date: checkpoint.date ? checkpoint.date.split("T")[0] : "",
+        todos: checkpoint.todos ? [...checkpoint.todos] : [],
+        files: checkpoint.files ? [...checkpoint.files] : []
+      });
+      setExistingFiles(checkpoint.files ? [...checkpoint.files] : []);
+      setTodoInput("");
+      setNewFiles([]);
+      setEditingTodoIndex(-1);
+      setEditTodoText("");
+    }
+  }, [checkpoint, open]);
+
+  const isViewMode = mode === "view";
+
+  // View Mode Functions
+  const handleDownload = (filename) => {
+    window.open(`http://localhost:5000/uploads/${filename}`, "_blank");
+  };
+
+  // Edit Mode Functions
+  const handleAddTodo = () => {
+    if (todoInput.trim()) {
+      setEditData(prev => ({
+        ...prev,
+        todos: [...prev.todos, todoInput.trim()]
+      }));
+      setTodoInput("");
+    }
+  };
+
+  const handleRemoveTodo = (index) => {
+    const updatedTodos = [...editData.todos];
+    updatedTodos.splice(index, 1);
+    setEditData(prev => ({
+      ...prev,
+      todos: updatedTodos
+    }));
+  };
+
+  const handleEditTodo = (index) => {
+    setEditingTodoIndex(index);
+    setEditTodoText(editData.todos[index]);
+  };
+
+  const handleSaveTodoEdit = () => {
+    if (editTodoText.trim() && editingTodoIndex !== -1) {
+      const updatedTodos = [...editData.todos];
+      updatedTodos[editingTodoIndex] = editTodoText.trim();
+      setEditData(prev => ({
+        ...prev,
+        todos: updatedTodos
+      }));
+      setEditingTodoIndex(-1);
+      setEditTodoText("");
+    }
+  };
+
+  const handleCancelTodoEdit = () => {
+    setEditingTodoIndex(-1);
+    setEditTodoText("");
+  };
+
+  const handleRemoveExistingFile = async (filename) => {
+    try {
+      await axios.delete(`http://localhost:5000/api/files/${checkpoint._id}/${filename}`);
+      const updatedFiles = existingFiles.filter(f => f !== filename);
+      setExistingFiles(updatedFiles);
+      setEditData(prev => ({
+        ...prev,
+        files: updatedFiles
+      }));
+    } catch (err) {
+      console.error("Failed to delete file:", err);
+      alert("Failed to delete file");
+    }
+  };
+
+  const handleRemoveNewFile = (index) => {
+    const updatedFiles = [...newFiles];
+    updatedFiles.splice(index, 1);
+    setNewFiles(updatedFiles);
+  };
+
+  const handleFileChange = (e) => {
+    const filesArray = Array.from(e.target.files);
+    setNewFiles(prev => [...prev, ...filesArray]);
+  };
+
+  const handleSave = async () => {
+    if (!editData.checkpoint || !editData.date || editData.todos.length === 0) {
+      alert("Please fill in all required fields");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const formData = new FormData();
+      formData.append("checkpoint", editData.checkpoint);
+      formData.append("date", editData.date);
+      formData.append("todos", JSON.stringify(editData.todos));
+      formData.append("existingFiles", JSON.stringify(existingFiles));
+      
+      // Add new files
+      newFiles.forEach(file => {
+        formData.append("files", file);
+      });
+
+      const res = await axios.put(
+        `http://localhost:5000/api/checkpoints/${checkpoint._id}`,
+        formData,
+        {
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
+        }
+      );
+
+      onUpdate(res.data);
+      onClose();
+    } catch (err) {
+      console.error("Update error:", err);
+      alert("Failed to update checkpoint");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const formatDate = (dateString) => {
+    if (!dateString) return "N/A";
+    try {
+      return new Date(dateString).toLocaleDateString("en-US", {
+        weekday: "long",
+        year: "numeric",
+        month: "long",
+        day: "numeric"
+      });
+    } catch (error) {
+      return "Invalid Date";
+    }
+  };
+
+  // Clear popup data when closing
+  const handleDialogClose = () => {
+    setEditData({
+      checkpoint: "",
+      date: "",
+      todos: [],
+      files: []
+    });
+    setTodoInput("");
+    setNewFiles([]);
+    setExistingFiles([]);
+    setEditingTodoIndex(-1);
+    setEditTodoText("");
+    onClose();
+  };
+
+  return (
+    <Dialog 
+      open={open} 
+      onClose={handleDialogClose}
+      maxWidth="md"
+      fullWidth
+      PaperProps={{
+        sx: { 
+          borderRadius: 2,
+          maxHeight: "90vh"
+        }
+      }}
+    >
+      <DialogTitle sx={{ 
+        bgcolor: isViewMode ? "primary.main" : "warning.main",
+        color: "white",
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        py: 2
+      }}>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+          {isViewMode ? <ViewIcon /> : <EditIcon />}
+          <Typography variant="h6">
+            {isViewMode ? "View Checkpoint" : "Edit Checkpoint"}
+          </Typography>
+        </Box>
+        <IconButton onClick={handleDialogClose} sx={{ color: "white" }}>
+          <CloseIcon />
+        </IconButton>
+      </DialogTitle>
+
+      <DialogContent sx={{ mt: 2 }}>
+        {loading && <LinearProgress sx={{ mb: 2 }} />}
+        
+        {isViewMode ? (
+          // VIEW MODE CONTENT
+          <Stack spacing={3}>
+            {/* Basic Info */}
+            <Paper variant="outlined" sx={{ p: 3 }}>
+              <Typography variant="h6" gutterBottom fontWeight="bold" color="primary">
+                📝 Checkpoint Information
+              </Typography>
+              <Grid container spacing={3}>
+                <Grid item xs={12} md={6}>
+                  <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                    Checkpoint Name
+                  </Typography>
+                  <Typography variant="body1" fontWeight="medium" sx={{ fontSize: "1.1rem" }}>
+                    {checkpoint.checkpoint}
+                  </Typography>
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                    Date
+                  </Typography>
+                  <Typography variant="body1" sx={{ fontSize: "1.1rem" }}>
+                    {formatDate(checkpoint.date)}
+                  </Typography>
+                </Grid>
+              </Grid>
+            </Paper>
+
+            {/* Todos Section - View Mode */}
+            <Paper variant="outlined" sx={{ p: 3 }}>
+              <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 2 }}>
+                <Typography variant="h6" fontWeight="bold" color="primary">
+                  ✅ Todo Items ({checkpoint.todos?.length || 0})
+                </Typography>
+              </Box>
+              
+              <Grid container spacing={2}>
+                {checkpoint.todos && checkpoint.todos.length > 0 ? (
+                  checkpoint.todos.map((todo, index) => (
+                    <Grid item xs={12} key={index}>
+                      <Card variant="outlined" sx={{ 
+                        borderColor: "#e0e0e0",
+                        bgcolor: "#f9f9f9",
+                        '&:hover': {
+                          boxShadow: 2,
+                          borderColor: "primary.main"
+                        }
+                      }}>
+                        <CardContent sx={{ py: 2, px: 3 }}>
+                          <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                            <Box sx={{ display: "flex", alignItems: "center", gap: 3 }}>
+                              <Chip 
+                                label={`${index + 1}`} 
+                                color="primary"
+                                sx={{ 
+                                  fontWeight: "bold", 
+                                  minWidth: "36px",
+                                  height: "36px",
+                                  fontSize: "1rem"
+                                }}
+                              />
+                              <Box>
+                                <Typography variant="h6" sx={{ mb: 0.5 }}>
+                                  {todo}
+                                </Typography>
+                                <Typography variant="caption" color="text.secondary">
+                                  Status: {index % 2 === 0 ? "Completed" : "Pending"}
+                                </Typography>
+                              </Box>
+                            </Box>
+                            <Stack direction="row" spacing={1}>
+                              <Tooltip title="View Todo Details">
+                                <IconButton size="small" color="info">
+                                  <ViewOutlinedIcon />
+                                </IconButton>
+                              </Tooltip>
+                            </Stack>
+                          </Box>
+                        </CardContent>
+                      </Card>
+                    </Grid>
+                  ))
+                ) : (
+                  <Grid item xs={12}>
+                    <Typography color="text.secondary" sx={{ textAlign: "center", py: 4 }}>
+                      No todos found
+                    </Typography>
+                  </Grid>
+                )}
+              </Grid>
+            </Paper>
+
+            {/* Files Section */}
+            {checkpoint.files && checkpoint.files.length > 0 && (
+              <Paper variant="outlined" sx={{ p: 3 }}>
+                <Typography variant="h6" gutterBottom fontWeight="bold" color="primary">
+                  📁 Attached Files ({checkpoint.files.length})
+                </Typography>
+                <Grid container spacing={2}>
+                  {checkpoint.files.map((file, index) => (
+                    <Grid item xs={12} sm={6} key={index}>
+                      <Paper
+                        variant="outlined"
+                        sx={{
+                          p: 2,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          cursor: "pointer",
+                          "&:hover": { 
+                            bgcolor: "action.hover",
+                            borderColor: "primary.main" 
+                          }
+                        }}
+                        onClick={() => handleDownload(file)}
+                      >
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+                          <AttachmentIcon color="primary" />
+                          <Box>
+                            <Typography variant="subtitle2" fontWeight="medium">
+                              File {index + 1}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              Click to download
+                            </Typography>
+                          </Box>
+                        </Box>
+                        <Tooltip title="Download">
+                          <DownloadIcon color="action" />
+                        </Tooltip>
+                      </Paper>
+                    </Grid>
+                  ))}
+                </Grid>
+              </Paper>
+            )}
+          </Stack>
+        ) : (
+          // EDIT MODE CONTENT
+          <Stack spacing={3}>
+            {/* Checkpoint & Date Inputs */}
+            <Paper variant="outlined" sx={{ p: 3 }}>
+              <Typography variant="h6" gutterBottom fontWeight="bold" color="warning">
+                ✏️ Edit Information
+              </Typography>
+              <Grid container spacing={3}>
+                <Grid item xs={12} md={6}>
+                  <TextField
+                    label="Checkpoint Name *"
+                    value={editData.checkpoint}
+                    onChange={(e) => setEditData(prev => ({...prev, checkpoint: e.target.value}))}
+                    fullWidth
+                    variant="outlined"
+                    error={!editData.checkpoint}
+                    helperText={!editData.checkpoint ? "Checkpoint name is required" : ""}
+                    InputProps={{
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <Typography color="warning.main">📌</Typography>
+                        </InputAdornment>
+                      ),
+                    }}
+                  />
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <TextField
+                    type="date"
+                    label="Date *"
+                    value={editData.date}
+                    onChange={(e) => setEditData(prev => ({...prev, date: e.target.value}))}
+                    InputLabelProps={{ shrink: true }}
+                    fullWidth
+                    variant="outlined"
+                    error={!editData.date}
+                    helperText={!editData.date ? "Date is required" : ""}
+                  />
+                </Grid>
+              </Grid>
+            </Paper>
+
+            {/* Todo Management */}
+            <Paper variant="outlined" sx={{ p: 3 }}>
+              <Typography variant="h6" gutterBottom fontWeight="bold" color="warning">
+                ✅ Manage Todos ({editData.todos.length})
+              </Typography>
+              
+              {/* ADD Todo Section */}
+              <Box sx={{ mb: 3, p: 2, bgcolor: "#fff8e1", borderRadius: 1, border: "1px solid #ffd54f" }}>
+                <Typography variant="subtitle1" gutterBottom fontWeight="medium" color="warning.dark">
+                  ➕ Add New Todo
+                </Typography>
+                <Stack direction="row" spacing={1}>
+                  <TextField
+                    placeholder="Enter todo item"
+                    value={todoInput}
+                    onChange={(e) => setTodoInput(e.target.value)}
+                    onKeyPress={(e) => e.key === "Enter" && handleAddTodo()}
+                    fullWidth
+                    size="medium"
+                    variant="outlined"
+                    InputProps={{
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <Typography color="warning.main">✅</Typography>
+                        </InputAdornment>
+                      ),
+                    }}
+                  />
+                  <Button
+                    variant="contained"
+                    onClick={handleAddTodo}
+                    disabled={!todoInput.trim()}
+                    startIcon={<AddCircleIcon />}
+                    sx={{
+                      bgcolor: "warning.main",
+                      "&:hover": { bgcolor: "warning.dark" }
+                    }}
+                  >
+                    Add Todo
+                  </Button>
+                </Stack>
+              </Box>
+
+              {/* TODO PREVIEW CARDS with Edit/Delete Icons INSIDE CARDS */}
+              {editData.todos.length > 0 && (
+                <Box sx={{ mt: 3 }}>
+                  <Typography variant="subtitle1" gutterBottom fontWeight="medium" color="warning.dark">
+                    📋 Todo Preview ({editData.todos.length})
+                  </Typography>
+                  
+                  {/* EDITING MODE for specific todo */}
+                  {editingTodoIndex !== -1 && (
+                    <Card variant="outlined" sx={{ mb: 2, bgcolor: "#fff8e1", borderColor: "#ffb74d" }}>
+                      <CardContent>
+                        <Typography variant="subtitle1" fontWeight="medium" gutterBottom>
+                          ✏️ Edit Todo #{editingTodoIndex + 1}
+                        </Typography>
+                        <Stack direction="row" spacing={1} alignItems="center">
+                          <TextField
+                            value={editTodoText}
+                            onChange={(e) => setEditTodoText(e.target.value)}
+                            fullWidth
+                            size="medium"
+                            variant="outlined"
+                            autoFocus
+                            placeholder="Edit todo text..."
+                          />
+                          <Button
+                            variant="contained"
+                            onClick={handleSaveTodoEdit}
+                            startIcon={<CheckIcon />}
+                            sx={{
+                              bgcolor: "success.main",
+                              "&:hover": { bgcolor: "success.dark" }
+                            }}
+                          >
+                            Save
+                          </Button>
+                          <Button
+                            variant="outlined"
+                            onClick={handleCancelTodoEdit}
+                            startIcon={<CancelIcon />}
+                            color="inherit"
+                          >
+                            Cancel
+                          </Button>
+                        </Stack>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {/* TODO PREVIEW CARDS */}
+                  <Grid container spacing={2}>
+                    {editData.todos.map((todo, index) => (
+                      <Grid item xs={12} key={index}>
+                        <Card 
+                          variant="outlined" 
+                          sx={{ 
+                            borderColor: editingTodoIndex === index ? "#ffb74d" : "#e0e0e0",
+                            bgcolor: editingTodoIndex === index ? "#fff8e1" : (index % 2 === 0 ? "#f9f9f9" : "white"),
+                            '&:hover': {
+                              boxShadow: 2,
+                              borderColor: editingTodoIndex === index ? "#ffb74d" : "primary.main"
+                            },
+                            transition: "all 0.2s ease"
+                          }}
+                        >
+                          <CardContent sx={{ py: 2, px: 3 }}>
+                            <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                              {/* Left Side: Todo Info */}
+                              <Box sx={{ display: "flex", alignItems: "center", gap: 3, flex: 1 }}>
+                                <Chip 
+                                  label={`${index + 1}`} 
+                                  color={editingTodoIndex === index ? "warning" : "primary"}
+                                  sx={{ 
+                                    fontWeight: "bold", 
+                                    minWidth: "36px",
+                                    height: "36px",
+                                    fontSize: "1rem"
+                                  }}
+                                />
+                                <Box sx={{ flex: 1 }}>
+                                  <Typography variant="h6" sx={{ mb: 0.5 }}>
+                                    {todo}
+                                  </Typography>
+                                  <Typography variant="caption" color="text.secondary">
+                                    Added: {new Date().toLocaleDateString()}
+                                  </Typography>
+                                </Box>
+                              </Box>
+
+                              {/* Right Side: Action Buttons INSIDE CARD */}
+                              {editingTodoIndex !== index && (
+                                <CardActions sx={{ p: 0 }}>
+                                  <Stack direction="row" spacing={1}>
+                                    {/* Edit Button */}
+                                    <Tooltip title="Edit Todo">
+                                      <IconButton
+                                        size="medium"
+                                        onClick={() => handleEditTodo(index)}
+                                        sx={{ 
+                                          bgcolor: "#fff8e1",
+                                          color: "warning.main",
+                                          '&:hover': { 
+                                            bgcolor: "#ffecb3",
+                                            color: "warning.dark"
+                                          }
+                                        }}
+                                      >
+                                        <EditIcon />
+                                      </IconButton>
+                                    </Tooltip>
+
+                                    {/* Delete Button */}
+                                    <Tooltip title="Delete Todo">
+                                      <IconButton
+                                        size="medium"
+                                        onClick={() => {
+                                          if (window.confirm(`Are you sure you want to delete "${todo}"?`)) {
+                                            handleRemoveTodo(index);
+                                          }
+                                        }}
+                                        sx={{ 
+                                          bgcolor: "#ffebee",
+                                          color: "error.main",
+                                          '&:hover': { 
+                                            bgcolor: "#ffcdd2",
+                                            color: "error.dark"
+                                          }
+                                        }}
+                                      >
+                                        <DeleteIcon />
+                                      </IconButton>
+                                    </Tooltip>
+                                  </Stack>
+                                </CardActions>
+                              )}
+                            </Box>
+                          </CardContent>
+                        </Card>
+                      </Grid>
+                    ))}
+                  </Grid>
+                </Box>
+              )}
+            </Paper>
+
+            {/* Files Management */}
+            <Paper variant="outlined" sx={{ p: 3 }}>
+              <Typography variant="h6" gutterBottom fontWeight="bold" color="warning">
+                📁 Manage Files
+              </Typography>
+
+              {/* Existing Files */}
+              {existingFiles.length > 0 && (
+                <Box sx={{ mb: 4 }}>
+                  <Typography variant="subtitle1" gutterBottom fontWeight="medium">
+                    Existing Files ({existingFiles.length})
+                  </Typography>
+                  <Grid container spacing={2}>
+                    {existingFiles.map((file, index) => (
+                      <Grid item xs={12} sm={6} key={index}>
+                        <Card variant="outlined">
+                          <CardContent sx={{ py: 1.5, px: 2 }}>
+                            <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                              <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+                                <AttachmentIcon color="primary" />
+                                <Typography variant="body2" noWrap sx={{ maxWidth: "150px" }}>
+                                  {file}
+                                </Typography>
+                              </Box>
+                              <IconButton
+                                size="small"
+                                onClick={() => handleRemoveExistingFile(file)}
+                                color="error"
+                              >
+                                <DeleteIcon />
+                              </IconButton>
+                            </Box>
+                          </CardContent>
+                        </Card>
+                      </Grid>
+                    ))}
+                  </Grid>
+                </Box>
+              )}
+
+              {/* Add New Files */}
+              <Box>
+                <Typography variant="subtitle1" gutterBottom fontWeight="medium">
+                  Upload New Files
+                </Typography>
+                <Button
+                  component="label"
+                  variant="outlined"
+                  startIcon={<UploadIcon />}
+                  sx={{ 
+                    mb: 2,
+                    borderColor: "warning.main",
+                    color: "warning.main",
+                    '&:hover': {
+                      borderColor: "warning.dark",
+                      bgcolor: "warning.light"
+                    }
+                  }}
+                >
+                  Select Files
+                  <input
+                    type="file"
+                    hidden
+                    multiple
+                    onChange={handleFileChange}
+                  />
+                </Button>
+
+                {/* New Files List */}
+                {newFiles.length > 0 && (
+                  <Grid container spacing={1} sx={{ mt: 2 }}>
+                    {newFiles.map((file, index) => (
+                      <Grid item xs={12} sm={6} key={index}>
+                        <Card variant="outlined">
+                          <CardContent sx={{ py: 1, px: 2 }}>
+                            <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                              <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                                <AttachmentIcon fontSize="small" />
+                                <Typography variant="body2" noWrap sx={{ maxWidth: "150px" }}>
+                                  {file.name}
+                                </Typography>
+                              </Box>
+                              <IconButton
+                                size="small"
+                                onClick={() => handleRemoveNewFile(index)}
+                                color="error"
+                              >
+                                <DeleteIcon fontSize="small" />
+                              </IconButton>
+                            </Box>
+                          </CardContent>
+                        </Card>
+                      </Grid>
+                    ))}
+                  </Grid>
+                )}
+              </Box>
+            </Paper>
+          </Stack>
+        )}
+      </DialogContent>
+
+      <DialogActions sx={{ px: 3, pb: 2 }}>
+        {isViewMode ? (
+          <Button
+            variant="contained"
+            startIcon={<EditIcon />}
+            onClick={() => {
+              const event = new CustomEvent("switchToEdit", { detail: checkpoint._id });
+              window.dispatchEvent(event);
+              onClose();
+            }}
+            sx={{
+              bgcolor: "warning.main",
+              "&:hover": { bgcolor: "warning.dark" }
+            }}
+          >
+            Edit Checkpoint
+          </Button>
+        ) : (
+          <>
+            <Button
+              variant="outlined"
+              startIcon={<CancelIcon />}
+              onClick={handleDialogClose}
+              disabled={loading}
+              sx={{
+                borderColor: "grey.400",
+                color: "grey.700"
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="contained"
+              startIcon={<SaveIcon />}
+              onClick={handleSave}
+              disabled={loading || !editData.checkpoint || !editData.date || editData.todos.length === 0}
+              sx={{
+                bgcolor: "success.main",
+                "&:hover": { bgcolor: "success.dark" }
+              }}
+            >
+              {loading ? "Saving..." : "Save Changes"}
+            </Button>
+          </>
+        )}
+      </DialogActions>
+    </Dialog>
+  );
+}
+----------------------------------------------------

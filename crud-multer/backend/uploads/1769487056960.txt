@@ -1,0 +1,2186 @@
+new form
+
+import React, { useState } from 'react';
+import {
+  Card,
+  CardContent,
+  Typography,
+  TextField,
+  Button,
+  Grid,
+  Box,
+  IconButton,
+  Chip,
+  InputAdornment
+} from '@mui/material';
+import {
+  Add as AddIcon,
+  CheckBox as CheckBoxIcon,
+  CheckBoxOutlineBlank as CheckBoxOutlineBlankIcon,
+  InsertDriveFile as FileIcon,
+  AttachFile as AttachFileIcon
+} from '@mui/icons-material';
+
+function CheckpointForm({ onSave }) {
+  const [formData, setFormData] = useState({
+    name: '',
+    date: '',
+    todos: [],
+    todoInput: '',
+    files: []
+  });
+
+  const handleAddTodo = () => {
+    if (!formData.todoInput.trim()) return;
+    const newTodo = {
+      id: Date.now(),
+      text: formData.todoInput,
+      completed: false
+    };
+    setFormData(prev => ({
+      ...prev,
+      todos: [...prev.todos, newTodo],
+      todoInput: ''
+    }));
+  };
+
+  const handleKeyPress = (e) => {
+    if (e.key === 'Enter') {
+      handleAddTodo();
+    }
+  };
+
+  const handleFileUpload = (e) => {
+    const files = Array.from(e.target.files);
+    setFormData(prev => ({
+      ...prev,
+      files: [...prev.files, ...files]
+    }));
+  };
+
+  const handleClear = () => {
+    setFormData({
+      name: '',
+      date: '',
+      todos: [],
+      todoInput: '',
+      files: []
+    });
+  };
+
+  const handleSubmit = () => {
+    onSave(formData);
+    handleClear();
+  };
+
+  return (
+    <Card sx={{ mb: 4, borderRadius: 2 }}>
+      <CardContent sx={{ p: 3 }}>
+        <Typography variant="h6" gutterBottom sx={{ fontWeight: 'bold' }}>
+          Add New Checkpoint
+        </Typography>
+        
+        <Grid container spacing={2}>
+          <Grid item xs={12} sm={6}>
+            <Typography variant="subtitle2" gutterBottom>
+              Checkpoint Name *
+            </Typography>
+            <TextField
+              fullWidth
+              placeholder="Enter checkpoint name"
+              value={formData.name}
+              onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+              size="small"
+            />
+          </Grid>
+          
+          <Grid item xs={12} sm={6}>
+            <Typography variant="subtitle2" gutterBottom>
+              Date *
+            </Typography>
+            <TextField
+              fullWidth
+              type="date"
+              value={formData.date}
+              onChange={(e) => setFormData(prev => ({ ...prev, date: e.target.value }))}
+              size="small"
+              InputLabelProps={{ shrink: true }}
+            />
+          </Grid>
+          
+          <Grid item xs={12}>
+            <Typography variant="subtitle2" gutterBottom>
+              Add Todos *
+            </Typography>
+            <TextField
+              fullWidth
+              placeholder="Enter todo item"
+              value={formData.todoInput}
+              onChange={(e) => setFormData(prev => ({ ...prev, todoInput: e.target.value }))}
+              onKeyPress={handleKeyPress}
+              size="small"
+              InputProps={{
+                endAdornment: (
+                  <InputAdornment position="end">
+                    <IconButton 
+                      onClick={handleAddTodo} 
+                      size="small"
+                      sx={{ 
+                        backgroundColor: '#1976d2',
+                        color: 'white',
+                        '&:hover': {
+                          backgroundColor: '#1565c0'
+                        }
+                      }}
+                    >
+                      <AddIcon fontSize="small" />
+                    </IconButton>
+                  </InputAdornment>
+                )
+              }}
+            />
+            
+            {formData.todos.length > 0 && (
+              <Box sx={{ mt: 2, ml: 1 }}>
+                {formData.todos.map((todo, index) => (
+                  <Box key={index} sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                    {todo.completed ? 
+                      <CheckBoxIcon fontSize="small" sx={{ color: '#1976d2' }} /> : 
+                      <CheckBoxOutlineBlankIcon fontSize="small" sx={{ color: '#666' }} />
+                    }
+                    <Typography variant="body2">{todo.text}</Typography>
+                  </Box>
+                ))}
+              </Box>
+            )}
+          </Grid>
+          
+          <Grid item xs={12}>
+            <Typography variant="subtitle2" gutterBottom>
+              Upload Files (Optional)
+            </Typography>
+            <Button
+              variant="outlined"
+              component="label"
+              startIcon={<AttachFileIcon />}
+              size="small"
+            >
+              SELECT FILES
+              <input
+                type="file"
+                hidden
+                multiple
+                onChange={handleFileUpload}
+              />
+            </Button>
+            
+            {formData.files.length > 0 && (
+              <Box sx={{ mt: 1, display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                {formData.files.map((file, index) => (
+                  <Chip
+                    key={index}
+                    icon={<FileIcon />}
+                    label={file.name}
+                    size="small"
+                    onDelete={() => {
+                      const updatedFiles = [...formData.files];
+                      updatedFiles.splice(index, 1);
+                      setFormData(prev => ({ ...prev, files: updatedFiles }));
+                    }}
+                    sx={{ 
+                      backgroundColor: 'rgba(25, 118, 210, 0.08)',
+                      '& .MuiChip-icon': { color: '#1976d2' }
+                    }}
+                  />
+                ))}
+              </Box>
+            )}
+          </Grid>
+          
+          <Grid item xs={12} sx={{ display: 'flex', gap: 2, mt: 2 }}>
+            <Button
+              variant="outlined"
+              onClick={handleClear}
+              sx={{ textTransform: 'none' }}
+            >
+              Clear
+            </Button>
+            <Button
+              variant="contained"
+              onClick={handleSubmit}
+              sx={{ textTransform: 'none' }}
+            >
+              Save Checkpoint
+            </Button>
+          </Grid>
+        </Grid>
+      </CardContent>
+    </Card>
+  );
+}
+
+
+export default CheckpointForm;
+
+-------------------------------------------------------
+                                      currect version
+
+       I understand. Here's the updated solution without EditPopup.js. I'll integrate the edit functionality directly into CheckpointDialog.js:
+
+## 1. CheckpointForm.js (Updated)
+
+```javascript
+import React, { useState } from 'react';
+import {
+  Card,
+  CardContent,
+  Typography,
+  TextField,
+  Button,
+  Grid,
+  Box,
+  IconButton,
+  Chip,
+  InputAdornment,
+  Stack,
+  Paper
+} from '@mui/material';
+import {
+  Add as AddIcon,
+  Visibility as ViewIcon,
+  Edit as EditIcon,
+  Delete as DeleteIcon,
+  AttachFile as AttachFileIcon,
+  Clear as ClearIcon,
+  InsertDriveFile as FileIcon
+} from '@mui/icons-material';
+import FileViewerDialog from './FileViewerDialog';
+
+function CheckpointForm({ onSave }) {
+  const [formData, setFormData] = useState({
+    name: '',
+    date: '',
+    todos: [],
+    todoInput: '',
+    files: []
+  });
+  const [fileViewerOpen, setFileViewerOpen] = useState(false);
+  const [selectedFile, setSelectedFile] = useState({ url: '', name: '' });
+
+  const handleAddTodo = () => {
+    if (!formData.todoInput.trim()) return;
+    const newTodo = {
+      id: Date.now(),
+      text: formData.todoInput,
+      completed: false
+    };
+    setFormData(prev => ({
+      ...prev,
+      todos: [...prev.todos, newTodo],
+      todoInput: ''
+    }));
+  };
+
+  const handleKeyPress = (e) => {
+    if (e.key === 'Enter') {
+      handleAddTodo();
+    }
+  };
+
+  const handleFileUpload = (e) => {
+    const files = Array.from(e.target.files);
+    setFormData(prev => ({
+      ...prev,
+      files: [...prev.files, ...files.map(file => ({
+        name: file.name,
+        type: file.type,
+        size: file.size,
+        file: file
+      }))]
+    }));
+  };
+
+  const handleClear = () => {
+    setFormData({
+      name: '',
+      date: '',
+      todos: [],
+      todoInput: '',
+      files: []
+    });
+  };
+
+  const handleSubmit = () => {
+    if (!formData.name.trim() || !formData.date.trim()) {
+      alert('Please fill in Checkpoint Name and Date');
+      return;
+    }
+    onSave(formData);
+    handleClear();
+  };
+
+  const handleRemoveTodo = (index) => {
+    const updatedTodos = [...formData.todos];
+    updatedTodos.splice(index, 1);
+    setFormData(prev => ({ ...prev, todos: updatedTodos }));
+  };
+
+  const handleRemoveFile = (index) => {
+    const updatedFiles = [...formData.files];
+    updatedFiles.splice(index, 1);
+    setFormData(prev => ({ ...prev, files: updatedFiles }));
+  };
+
+  const handleEditTodo = (index) => {
+    const todoText = prompt('Edit todo:', formData.todos[index].text);
+    if (todoText !== null) {
+      const updatedTodos = [...formData.todos];
+      updatedTodos[index].text = todoText;
+      setFormData(prev => ({ ...prev, todos: updatedTodos }));
+    }
+  };
+
+  const handlePreviewFile = (file, index) => {
+    const fileUrl = URL.createObjectURL(file.file);
+    setSelectedFile({
+      url: fileUrl,
+      name: file.name
+    });
+    setFileViewerOpen(true);
+  };
+
+  const handleCloseFileViewer = () => {
+    if (selectedFile.url) {
+      URL.revokeObjectURL(selectedFile.url);
+    }
+    setFileViewerOpen(false);
+    setSelectedFile({ url: '', name: '' });
+  };
+
+  return (
+    <>
+      <Card sx={{ mb: 4, borderRadius: 2 }}>
+        <CardContent sx={{ p: 3 }}>
+          <Typography variant="h6" gutterBottom sx={{ fontWeight: 'bold', mb: 3 }}>
+            Add New Checkpoint
+          </Typography>
+          
+          <Stack direction="row" spacing={2} alignItems="flex-start" sx={{ mb: 3 }}>
+            <Box sx={{ flex: 1, minWidth: 150 }}>
+              <Typography variant="caption" display="block" gutterBottom sx={{ fontWeight: 'bold' }}>
+                Checkpoint Name *
+              </Typography>
+              <TextField
+                fullWidth
+                placeholder="Enter name"
+                value={formData.name}
+                onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                size="small"
+                sx={{ backgroundColor: 'white' }}
+              />
+            </Box>
+
+            <Box sx={{ flex: 1, minWidth: 150 }}>
+              <Typography variant="caption" display="block" gutterBottom sx={{ fontWeight: 'bold' }}>
+                Date *
+              </Typography>
+              <TextField
+                fullWidth
+                type="date"
+                value={formData.date}
+                onChange={(e) => setFormData(prev => ({ ...prev, date: e.target.value }))}
+                size="small"
+                sx={{ backgroundColor: 'white' }}
+                InputLabelProps={{ shrink: true }}
+              />
+            </Box>
+
+            <Box sx={{ flex: 2, minWidth: 200 }}>
+              <Typography variant="caption" display="block" gutterBottom sx={{ fontWeight: 'bold' }}>
+                Add Todos *
+              </Typography>
+              <TextField
+                fullWidth
+                placeholder="Enter todo item"
+                value={formData.todoInput}
+                onChange={(e) => setFormData(prev => ({ ...prev, todoInput: e.target.value }))}
+                onKeyPress={handleKeyPress}
+                size="small"
+                sx={{ backgroundColor: 'white' }}
+                InputProps={{
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <IconButton 
+                        onClick={handleAddTodo} 
+                        size="small"
+                        sx={{ 
+                          backgroundColor: '#1976d2',
+                          color: 'white',
+                          '&:hover': {
+                            backgroundColor: '#1565c0'
+                          }
+                        }}
+                      >
+                        <AddIcon fontSize="small" />
+                      </IconButton>
+                    </InputAdornment>
+                  )
+                }}
+              />
+            </Box>
+
+            <Box sx={{ flex: 1, minWidth: 150 }}>
+              <Typography variant="caption" display="block" gutterBottom sx={{ fontWeight: 'bold' }}>
+                Upload Files (Optional)
+              </Typography>
+              <Button
+                variant="outlined"
+                component="label"
+                startIcon={<AttachFileIcon />}
+                size="small"
+                fullWidth
+                sx={{ 
+                  backgroundColor: 'white',
+                  justifyContent: 'flex-start',
+                  textTransform: 'none'
+                }}
+              >
+                SELECT FILES
+                <input
+                  type="file"
+                  hidden
+                  multiple
+                  onChange={handleFileUpload}
+                />
+              </Button>
+            </Box>
+
+            <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', pt: 2 }}>
+              <Button
+                variant="outlined"
+                onClick={handleClear}
+                sx={{ textTransform: 'none' }}
+                startIcon={<ClearIcon />}
+              >
+                Clear
+              </Button>
+              <Button
+                variant="contained"
+                onClick={handleSubmit}
+                sx={{ textTransform: 'none' }}
+              >
+                Save
+              </Button>
+            </Box>
+          </Stack>
+
+          {formData.todos.length > 0 && (
+            <Paper elevation={0} sx={{ p: 2, mb: 2, backgroundColor: '#f8f9fa', borderRadius: 1 }}>
+              <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 'bold', color: '#555' }}>
+                Todo Preview
+              </Typography>
+              <Grid container spacing={1}>
+                {formData.todos.map((todo, index) => (
+                  <Grid item xs={12} sm={6} md={4} key={todo.id}>
+                    <Paper 
+                      elevation={0} 
+                      sx={{ 
+                        p: 2, 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        justifyContent: 'space-between',
+                        backgroundColor: 'white',
+                        border: '1px solid #e0e0e0',
+                        borderRadius: 1
+                      }}
+                    >
+                      <Typography variant="body2" sx={{ fontWeight: 'medium' }}>
+                        {todo.text}
+                      </Typography>
+                      <Box sx={{ display: 'flex', gap: 0.5 }}>
+                        <IconButton 
+                          size="small" 
+                          onClick={() => handleEditTodo(index)}
+                          sx={{ color: '#4caf50' }}
+                        >
+                          <EditIcon fontSize="small" />
+                        </IconButton>
+                        <IconButton 
+                          size="small" 
+                          onClick={() => handleRemoveTodo(index)}
+                          sx={{ color: '#f44336' }}
+                        >
+                          <DeleteIcon fontSize="small" />
+                        </IconButton>
+                      </Box>
+                    </Paper>
+                  </Grid>
+                ))}
+              </Grid>
+            </Paper>
+          )}
+
+          {formData.files.length > 0 && (
+            <Paper elevation={0} sx={{ p: 2, backgroundColor: '#f8f9fa', borderRadius: 1 }}>
+              <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 'bold', color: '#555' }}>
+                File Preview
+              </Typography>
+              <Grid container spacing={1}>
+                {formData.files.map((file, index) => (
+                  <Grid item xs={12} sm={6} md={4} key={index}>
+                    <Paper 
+                      elevation={0} 
+                      sx={{ 
+                        p: 1.5, 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        justifyContent: 'space-between',
+                        backgroundColor: 'white',
+                        border: '1px solid #e0e0e0',
+                        borderRadius: 1
+                      }}
+                    >
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <FileIcon fontSize="small" sx={{ color: '#666' }} />
+                        <Typography variant="body2" noWrap sx={{ maxWidth: 150 }}>
+                          {file.name}
+                        </Typography>
+                      </Box>
+                      <Box sx={{ display: 'flex', gap: 0.5 }}>
+                        <IconButton 
+                          size="small" 
+                          onClick={() => handlePreviewFile(file, index)}
+                          sx={{ color: '#2196f3' }}
+                        >
+                          <ViewIcon fontSize="small" />
+                        </IconButton>
+                        <IconButton 
+                          size="small" 
+                          onClick={() => handleRemoveFile(index)}
+                          sx={{ color: '#f44336' }}
+                        >
+                          <DeleteIcon fontSize="small" />
+                        </IconButton>
+                      </Box>
+                    </Paper>
+                  </Grid>
+                ))}
+              </Grid>
+            </Paper>
+          )}
+        </CardContent>
+      </Card>
+
+      <FileViewerDialog
+        open={fileViewerOpen}
+        onClose={handleCloseFileViewer}
+        fileUrl={selectedFile.url}
+        fileName={selectedFile.name}
+      />
+    </>
+  );
+}
+
+export default CheckpointForm;
+```
+
+## 2. CheckpointTable.js (Updated without EditPopup)
+
+```javascript
+import React, { useState } from 'react';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Paper,
+  Avatar,
+  IconButton,
+  Box,
+  Typography,
+  Chip,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Button,
+  Grid,
+  TextField,
+  InputAdornment
+} from '@mui/material';
+import {
+  Visibility as ViewIcon,
+  Edit as EditIcon,
+  Delete as DeleteIcon,
+  CheckBox as CheckBoxIcon,
+  CheckBoxOutlineBlank as CheckBoxOutlineBlankIcon,
+  InsertDriveFile as FileIcon,
+  Add as AddIcon
+} from '@mui/icons-material';
+import ConfirmDialog from './ConfirmDialog';
+import FileViewerDialog from './FileViewerDialog';
+
+function CheckpointTable({ 
+  checkpoints, 
+  onEdit, 
+  onDelete
+}) {
+  const [viewDialogOpen, setViewDialogOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [fileViewerOpen, setFileViewerOpen] = useState(false);
+  const [selectedCheckpoint, setSelectedCheckpoint] = useState(null);
+  const [selectedFile, setSelectedFile] = useState({ url: '', name: '' });
+  const [editFormData, setEditFormData] = useState({
+    name: '',
+    date: '',
+    todos: [],
+    todoInput: ''
+  });
+  const [editingTodoIndex, setEditingTodoIndex] = useState(null);
+  const [editingTodoText, setEditingTodoText] = useState('');
+
+  const handleViewOpen = (checkpoint) => {
+    setSelectedCheckpoint(checkpoint);
+    setViewDialogOpen(true);
+  };
+
+  const handleEditOpen = (checkpoint) => {
+    setSelectedCheckpoint(checkpoint);
+    setEditFormData({
+      name: checkpoint.checkpoint || checkpoint.name || '',
+      date: checkpoint.date ? new Date(checkpoint.date).toISOString().split('T')[0] : '',
+      todos: checkpoint.todos || [],
+      todoInput: ''
+    });
+    setEditDialogOpen(true);
+  };
+
+  const handleDeleteOpen = (checkpoint) => {
+    setSelectedCheckpoint(checkpoint);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleClose = () => {
+    setViewDialogOpen(false);
+    setEditDialogOpen(false);
+    setDeleteDialogOpen(false);
+    setSelectedCheckpoint(null);
+    setEditingTodoIndex(null);
+    setEditingTodoText('');
+  };
+
+  const handleDeleteConfirm = () => {
+    if (selectedCheckpoint) {
+      onDelete(selectedCheckpoint._id);
+      handleClose();
+    }
+  };
+
+  const handleAddTodo = () => {
+    if (!editFormData.todoInput.trim()) return;
+    const newTodo = {
+      id: Date.now(),
+      text: editFormData.todoInput,
+      completed: false
+    };
+    setEditFormData(prev => ({
+      ...prev,
+      todos: [...prev.todos, newTodo],
+      todoInput: ''
+    }));
+  };
+
+  const handleEditTodo = (index) => {
+    const todo = editFormData.todos[index];
+    setEditingTodoIndex(index);
+    setEditingTodoText(typeof todo === 'object' ? todo.text : todo);
+  };
+
+  const handleSaveTodoEdit = () => {
+    if (editingTodoIndex !== null && editingTodoText.trim()) {
+      const updatedTodos = [...editFormData.todos];
+      if (typeof updatedTodos[editingTodoIndex] === 'object') {
+        updatedTodos[editingTodoIndex].text = editingTodoText;
+      } else {
+        updatedTodos[editingTodoIndex] = editingTodoText;
+      }
+      setEditFormData(prev => ({ ...prev, todos: updatedTodos }));
+      setEditingTodoIndex(null);
+      setEditingTodoText('');
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setEditingTodoIndex(null);
+    setEditingTodoText('');
+  };
+
+  const handleRemoveTodo = (index) => {
+    const updatedTodos = [...editFormData.todos];
+    updatedTodos.splice(index, 1);
+    setEditFormData(prev => ({ ...prev, todos: updatedTodos }));
+  };
+
+  const handleSaveEdit = () => {
+    if (selectedCheckpoint && editFormData.name.trim() && editFormData.date.trim()) {
+      onEdit(selectedCheckpoint._id, editFormData);
+      handleClose();
+    }
+  };
+
+  const handleKeyPress = (e) => {
+    if (e.key === 'Enter') {
+      handleAddTodo();
+    }
+  };
+
+  const handlePreviewFile = (file) => {
+    const fileUrl = typeof file === 'string' ? 
+      `${process.env.REACT_APP_API_URL}/uploads/${file}` : 
+      file.url || file.path;
+    setSelectedFile({
+      url: fileUrl,
+      name: typeof file === 'string' ? file : file.name || file.originalname
+    });
+    setFileViewerOpen(true);
+  };
+
+  const handleCloseFileViewer = () => {
+    setFileViewerOpen(false);
+    setSelectedFile({ url: '', name: '' });
+  };
+
+  return (
+    <>
+      <TableContainer 
+        component={Paper} 
+        sx={{ 
+          boxShadow: 'none',
+          border: '1px solid #e0e0e0',
+          borderRadius: 1
+        }}
+      >
+        <Table>
+          <TableHead>
+            <TableRow sx={{ backgroundColor: '#f8f9fa' }}>
+              <TableCell sx={{ fontWeight: 'bold', color: '#555', borderBottom: '2px solid #e0e0e0', width: 80 }}>S.NO</TableCell>
+              <TableCell sx={{ fontWeight: 'bold', color: '#555', borderBottom: '2px solid #e0e0e0' }}>Checkpoint</TableCell>
+              <TableCell sx={{ fontWeight: 'bold', color: '#555', borderBottom: '2px solid #e0e0e0' }}>Date</TableCell>
+              <TableCell sx={{ fontWeight: 'bold', color: '#555', borderBottom: '2px solid #e0e0e0' }}>Todos</TableCell>
+              <TableCell sx={{ fontWeight: 'bold', color: '#555', borderBottom: '2px solid #e0e0e0', width: 120 }}>Actions</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {checkpoints.map((checkpoint, index) => (
+              <TableRow 
+                key={checkpoint._id || index}
+                sx={{ 
+                  '&:hover': { backgroundColor: 'rgba(0,0,0,0.02)' },
+                  '&:last-child td': { borderBottom: 0 }
+                }}
+              >
+                <TableCell>
+                  <Avatar
+                    sx={{
+                      width: 28,
+                      height: 28,
+                      backgroundColor: '#1976d2',
+                      color: 'white',
+                      fontSize: '0.875rem',
+                      fontWeight: 'bold'
+                    }}
+                  >
+                    {index + 1}
+                  </Avatar>
+                </TableCell>
+                <TableCell>
+                  <Typography sx={{ fontWeight: 'medium' }}>
+                    {checkpoint.checkpoint || checkpoint.name}
+                  </Typography>
+                </TableCell>
+                <TableCell>
+                  <Typography sx={{ color: '#666' }}>
+                    {new Date(checkpoint.date).toLocaleDateString('en-US', {
+                      year: 'numeric',
+                      month: 'short',
+                      day: 'numeric'
+                    })}
+                  </Typography>
+                </TableCell>
+                <TableCell>
+                  {checkpoint.todos && checkpoint.todos.slice(0, 2).map((todo, todoIndex) => (
+                    <Box 
+                      key={todoIndex}
+                      sx={{ 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        gap: 1,
+                        mb: 0.5 
+                      }}
+                    >
+                      {typeof todo === 'object' && todo.completed ? 
+                        <CheckBoxIcon fontSize="small" sx={{ color: '#1976d2' }} /> : 
+                        <CheckBoxOutlineBlankIcon fontSize="small" sx={{ color: '#666' }} />
+                      }
+                      <Typography variant="body2">
+                        {typeof todo === 'object' ? todo.text : todo}
+                      </Typography>
+                    </Box>
+                  ))}
+                  {checkpoint.todos && checkpoint.todos.length > 2 && (
+                    <Typography variant="body2" sx={{ color: '#666', fontStyle: 'italic' }}>
+                      +{checkpoint.todos.length - 2} more
+                    </Typography>
+                  )}
+                </TableCell>
+                <TableCell>
+                  <IconButton 
+                    size="small" 
+                    onClick={() => handleViewOpen(checkpoint)}
+                    sx={{ 
+                      color: '#666',
+                      '&:hover': { color: '#2196f3', backgroundColor: 'rgba(33, 150, 243, 0.08)' }
+                    }}
+                  >
+                    <ViewIcon fontSize="small" />
+                  </IconButton>
+                  <IconButton 
+                    size="small" 
+                    onClick={() => handleEditOpen(checkpoint)}
+                    sx={{ 
+                      color: '#666',
+                      '&:hover': { color: '#4caf50', backgroundColor: 'rgba(76, 175, 80, 0.08)' }
+                    }}
+                  >
+                    <EditIcon fontSize="small" />
+                  </IconButton>
+                  <IconButton 
+                    size="small" 
+                    onClick={() => handleDeleteOpen(checkpoint)}
+                    sx={{ 
+                      color: '#666',
+                      '&:hover': { color: '#f44336', backgroundColor: 'rgba(244, 67, 54, 0.08)' }
+                    }}
+                  >
+                    <DeleteIcon fontSize="small" />
+                  </IconButton>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </TableContainer>
+
+      {/* View Dialog */}
+      <Dialog 
+        open={viewDialogOpen} 
+        onClose={handleClose} 
+        maxWidth="md" 
+        fullWidth
+        PaperProps={{ sx: { borderRadius: 2 } }}
+      >
+        <DialogTitle sx={{ fontWeight: 'bold', borderBottom: '1px solid #e0e0e0' }}>
+          Checkpoint Details
+        </DialogTitle>
+        <DialogContent sx={{ p: 3 }}>
+          {selectedCheckpoint && (
+            <>
+              <Grid container spacing={3}>
+                <Grid item xs={12} md={6}>
+                  <Typography variant="subtitle2" sx={{ color: '#666', mb: 1 }}>
+                    Checkpoint Name
+                  </Typography>
+                  <Typography sx={{ fontWeight: 'medium', mb: 2 }}>
+                    {selectedCheckpoint.checkpoint || selectedCheckpoint.name}
+                  </Typography>
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <Typography variant="subtitle2" sx={{ color: '#666', mb: 1 }}>
+                    Date
+                  </Typography>
+                  <Typography sx={{ mb: 2 }}>
+                    {new Date(selectedCheckpoint.date).toLocaleDateString('en-US', {
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric'
+                    })}
+                  </Typography>
+                </Grid>
+                <Grid item xs={12}>
+                  <Typography variant="subtitle2" sx={{ color: '#666', mb: 1 }}>
+                    Todos
+                  </Typography>
+                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 2 }}>
+                    {selectedCheckpoint.todos && selectedCheckpoint.todos.map((todo, index) => (
+                      <Chip
+                        key={index}
+                        icon={typeof todo === 'object' && todo.completed ? 
+                          <CheckBoxIcon fontSize="small" /> : 
+                          <CheckBoxOutlineBlankIcon fontSize="small" />
+                        }
+                        label={typeof todo === 'object' ? todo.text : todo}
+                        size="small"
+                        sx={{ 
+                          backgroundColor: 'rgba(25, 118, 210, 0.08)',
+                          '& .MuiChip-icon': { color: '#1976d2' }
+                        }}
+                      />
+                    ))}
+                  </Box>
+                </Grid>
+                {selectedCheckpoint.files && selectedCheckpoint.files.length > 0 && (
+                  <Grid item xs={12}>
+                    <Typography variant="subtitle2" sx={{ color: '#666', mb: 1 }}>
+                      Files
+                    </Typography>
+                    <TableContainer component={Paper} sx={{ boxShadow: 'none', border: '1px solid #e0e0e0' }}>
+                      <Table size="small">
+                        <TableHead>
+                          <TableRow sx={{ backgroundColor: '#f8f9fa' }}>
+                            <TableCell sx={{ fontWeight: 'bold' }}>File Name</TableCell>
+                            <TableCell sx={{ fontWeight: 'bold' }}>Type</TableCell>
+                            <TableCell sx={{ fontWeight: 'bold' }}>Actions</TableCell>
+                          </TableRow>
+                        </TableHead>
+                        <TableBody>
+                          {selectedCheckpoint.files.map((file, index) => (
+                            <TableRow key={index}>
+                              <TableCell>
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                  <FileIcon fontSize="small" sx={{ color: '#666' }} />
+                                  <Typography variant="body2">
+                                    {typeof file === 'string' ? file : file.name}
+                                  </Typography>
+                                </Box>
+                              </TableCell>
+                              <TableCell>
+                                <Typography variant="body2" sx={{ color: '#666' }}>
+                                  {typeof file === 'string' ? 
+                                    file.split('.').pop().toUpperCase() : 
+                                    file.type?.split('/')[1]?.toUpperCase() || 'File'
+                                  }
+                                </Typography>
+                              </TableCell>
+                              <TableCell>
+                                <IconButton 
+                                  size="small" 
+                                  sx={{ color: '#2196f3' }}
+                                  onClick={() => handlePreviewFile(file)}
+                                >
+                                  <ViewIcon fontSize="small" />
+                                </IconButton>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </TableContainer>
+                  </Grid>
+                )}
+              </Grid>
+            </>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ borderTop: '1px solid #e0e0e0', p: 2 }}>
+          <Button onClick={handleClose} sx={{ textTransform: 'none' }}>
+            Close
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Edit Dialog */}
+      <Dialog
+        open={editDialogOpen}
+        onClose={handleClose}
+        maxWidth="md"
+        fullWidth
+        PaperProps={{
+          sx: { borderRadius: 2 }
+        }}
+      >
+        <DialogTitle sx={{ fontWeight: 'bold', borderBottom: '1px solid #e0e0e0' }}>
+          Edit Checkpoint
+        </DialogTitle>
+        
+        <DialogContent sx={{ p: 3 }}>
+          <Grid container spacing={3}>
+            <Grid item xs={12} md={6}>
+              <Typography variant="subtitle2" sx={{ color: '#666', mb: 1 }}>
+                Checkpoint Name *
+              </Typography>
+              <TextField
+                fullWidth
+                value={editFormData.name}
+                onChange={(e) => setEditFormData(prev => ({ ...prev, name: e.target.value }))}
+                size="small"
+              />
+            </Grid>
+            
+            <Grid item xs={12} md={6}>
+              <Typography variant="subtitle2" sx={{ color: '#666', mb: 1 }}>
+                Date *
+              </Typography>
+              <TextField
+                fullWidth
+                type="date"
+                value={editFormData.date}
+                onChange={(e) => setEditFormData(prev => ({ ...prev, date: e.target.value }))}
+                size="small"
+                InputLabelProps={{ shrink: true }}
+              />
+            </Grid>
+            
+            <Grid item xs={12}>
+              <Typography variant="subtitle2" sx={{ color: '#666', mb: 1 }}>
+                Add New Todo
+              </Typography>
+              <TextField
+                fullWidth
+                placeholder="Enter todo item"
+                value={editFormData.todoInput}
+                onChange={(e) => setEditFormData(prev => ({ ...prev, todoInput: e.target.value }))}
+                onKeyPress={handleKeyPress}
+                size="small"
+                InputProps={{
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <IconButton 
+                        onClick={handleAddTodo} 
+                        size="small"
+                        sx={{ 
+                          backgroundColor: '#1976d2',
+                          color: 'white',
+                          '&:hover': {
+                            backgroundColor: '#1565c0'
+                          }
+                        }}
+                      >
+                        <AddIcon fontSize="small" />
+                      </IconButton>
+                    </InputAdornment>
+                  )
+                }}
+              />
+            </Grid>
+            
+            <Grid item xs={12}>
+              <Typography variant="subtitle2" sx={{ color: '#666', mb: 1 }}>
+                Todo Preview
+              </Typography>
+              <Grid container spacing={1}>
+                {editFormData.todos.map((todo, index) => (
+                  <Grid item xs={12} sm={6} md={4} key={index}>
+                    <Paper 
+                      elevation={0} 
+                      sx={{ 
+                        p: 2, 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        justifyContent: 'space-between',
+                        backgroundColor: 'white',
+                        border: '1px solid #e0e0e0',
+                        borderRadius: 1
+                      }}
+                    >
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        {editingTodoIndex === index ? (
+                          <TextField
+                            size="small"
+                            value={editingTodoText}
+                            onChange={(e) => setEditingTodoText(e.target.value)}
+                            onKeyPress={(e) => e.key === 'Enter' && handleSaveTodoEdit()}
+                            autoFocus
+                            sx={{ width: 120 }}
+                          />
+                        ) : (
+                          <Typography variant="body2">
+                            {typeof todo === 'object' ? todo.text : todo}
+                          </Typography>
+                        )}
+                      </Box>
+                      <Box sx={{ display: 'flex', gap: 0.5 }}>
+                        {editingTodoIndex === index ? (
+                          <>
+                            <IconButton 
+                              size="small" 
+                              onClick={handleSaveTodoEdit}
+                              sx={{ color: '#4caf50' }}
+                            >
+                              <CheckBoxIcon fontSize="small" />
+                            </IconButton>
+                            <IconButton 
+                              size="small" 
+                              onClick={handleCancelEdit}
+                              sx={{ color: '#f44336' }}
+                            >
+                              <DeleteIcon fontSize="small" />
+                            </IconButton>
+                          </>
+                        ) : (
+                          <>
+                            <IconButton 
+                              size="small" 
+                              onClick={() => handleEditTodo(index)}
+                              sx={{ color: '#4caf50' }}
+                            >
+                              <EditIcon fontSize="small" />
+                            </IconButton>
+                            <IconButton 
+                              size="small" 
+                              onClick={() => handleRemoveTodo(index)}
+                              sx={{ color: '#f44336' }}
+                            >
+                              <DeleteIcon fontSize="small" />
+                            </IconButton>
+                          </>
+                        )}
+                      </Box>
+                    </Paper>
+                  </Grid>
+                ))}
+              </Grid>
+            </Grid>
+          </Grid>
+        </DialogContent>
+        
+        <DialogActions sx={{ borderTop: '1px solid #e0e0e0', p: 2 }}>
+          <Button
+            onClick={handleClose}
+            sx={{ textTransform: 'none' }}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={handleSaveEdit}
+            variant="contained"
+            sx={{ textTransform: 'none' }}
+          >
+            Save Changes
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmDialog
+        open={deleteDialogOpen}
+        onClose={handleClose}
+        onConfirm={handleDeleteConfirm}
+        title="Delete Checkpoint"
+        message={`Are you sure you want to delete "${selectedCheckpoint?.checkpoint || selectedCheckpoint?.name}"?`}
+        confirmText="Delete"
+        confirmColor="error"
+      />
+
+      {/* File Viewer Dialog */}
+      <FileViewerDialog
+        open={fileViewerOpen}
+        onClose={handleCloseFileViewer}
+        fileUrl={selectedFile.url}
+        fileName={selectedFile.name}
+      />
+    </>
+  );
+}
+
+export default CheckpointTable;
+```
+
+## 3. FileViewerDialog.js (Same as before)
+
+```javascript
+import React from 'react';
+import {
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Button,
+  IconButton,
+  Typography,
+  Box
+} from '@mui/material';
+import {
+  Close as CloseIcon,
+  PictureAsPdf as PdfIcon,
+  Image as ImageIcon,
+  Description as TextIcon,
+  InsertDriveFile as FileIcon
+} from '@mui/icons-material';
+
+function FileViewerDialog({ open, onClose, fileUrl, fileName }) {
+  const getFileType = () => {
+    if (!fileName) return 'unknown';
+    const ext = fileName.split('.').pop().toLowerCase();
+    if (['pdf'].includes(ext)) return 'pdf';
+    if (['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'].includes(ext)) return 'image';
+    if (['txt', 'text', 'md', 'csv', 'json', 'xml'].includes(ext)) return 'text';
+    return 'unknown';
+  };
+
+  const renderFilePreview = () => {
+    const fileType = getFileType();
+    
+    if (!fileUrl) {
+      return (
+        <Box sx={{ p: 4, textAlign: 'center' }}>
+          <Typography color="textSecondary">No file to preview</Typography>
+        </Box>
+      );
+    }
+
+    switch (fileType) {
+      case 'pdf':
+        return (
+          <Box sx={{ width: '100%', height: '600px' }}>
+            <iframe
+              src={fileUrl}
+              title={fileName}
+              width="100%"
+              height="100%"
+              style={{ border: 'none' }}
+            />
+          </Box>
+        );
+      
+      case 'image':
+        return (
+          <Box sx={{ display: 'flex', justifyContent: 'center', p: 2 }}>
+            <img
+              src={fileUrl}
+              alt={fileName}
+              style={{ 
+                maxWidth: '100%', 
+                maxHeight: '600px',
+                objectFit: 'contain' 
+              }}
+            />
+          </Box>
+        );
+      
+      case 'text':
+        return (
+          <Box sx={{ width: '100%', height: '600px' }}>
+            <iframe
+              src={fileUrl}
+              title={fileName}
+              width="100%"
+              height="100%"
+              style={{ border: 'none' }}
+            />
+          </Box>
+        );
+      
+      default:
+        return (
+          <Box sx={{ p: 4, textAlign: 'center' }}>
+            <FileIcon sx={{ fontSize: 60, color: '#999', mb: 2 }} />
+            <Typography color="textSecondary" variant="h6">
+              Preview not available
+            </Typography>
+            <Typography variant="body2" sx={{ mt: 1, color: '#666' }}>
+              {fileName}
+            </Typography>
+          </Box>
+        );
+    }
+  };
+
+  const getFileIcon = () => {
+    const fileType = getFileType();
+    switch (fileType) {
+      case 'pdf': return <PdfIcon color="error" />;
+      case 'image': return <ImageIcon color="primary" />;
+      case 'text': return <TextIcon color="action" />;
+      default: return <FileIcon color="action" />;
+    }
+  };
+
+  return (
+    <Dialog
+      open={open}
+      onClose={onClose}
+      maxWidth="lg"
+      fullWidth
+      PaperProps={{
+        sx: { 
+          borderRadius: 2,
+          maxWidth: '90vw',
+          maxHeight: '90vh'
+        }
+      }}
+    >
+      <DialogTitle sx={{ 
+        display: 'flex', 
+        alignItems: 'center', 
+        justifyContent: 'space-between',
+        borderBottom: '1px solid #e0e0e0',
+        py: 2,
+        pr: 2
+      }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, overflow: 'hidden' }}>
+          {getFileIcon()}
+          <Typography 
+            variant="h6" 
+            sx={{ 
+              fontSize: '1rem', 
+              fontWeight: 500,
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap'
+            }}
+          >
+            {fileName || 'File Preview'}
+          </Typography>
+        </Box>
+        <IconButton
+          aria-label="close"
+          onClick={onClose}
+          size="small"
+          sx={{ ml: 1 }}
+        >
+          <CloseIcon />
+        </IconButton>
+      </DialogTitle>
+      
+      <DialogContent sx={{ p: 0, overflow: 'hidden' }}>
+        {renderFilePreview()}
+      </DialogContent>
+      
+      <DialogActions sx={{ 
+        borderTop: '1px solid #e0e0e0',
+        p: 2
+      }}>
+        <Button
+          onClick={onClose}
+          sx={{ textTransform: 'none' }}
+        >
+          Close
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
+export default FileViewerDialog;
+```
+
+## 4. ConfirmDialog.js (Required)
+
+```javascript
+import React from 'react';
+import {
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Button,
+  Typography
+} from '@mui/material';
+
+function ConfirmDialog({
+  open,
+  onClose,
+  onConfirm,
+  title = "Confirm Action",
+  message = "Are you sure you want to proceed?",
+  confirmText = "Confirm",
+  cancelText = "Cancel",
+  confirmColor = "primary"
+}) {
+  return (
+    <Dialog
+      open={open}
+      onClose={onClose}
+      maxWidth="xs"
+      fullWidth
+      PaperProps={{
+        sx: { borderRadius: 2 }
+      }}
+    >
+      <DialogTitle sx={{ 
+        fontWeight: 'bold', 
+        borderBottom: '1px solid #e0e0e0',
+        py: 2
+      }}>
+        {title}
+      </DialogTitle>
+      
+      <DialogContent sx={{ p: 3 }}>
+        <Typography>{message}</Typography>
+      </DialogContent>
+      
+      <DialogActions sx={{ 
+        borderTop: '1px solid #e0e0e0',
+        p: 2
+      }}>
+        <Button
+          onClick={onClose}
+          sx={{ textTransform: 'none' }}
+        >
+          {cancelText}
+        </Button>
+        <Button
+          onClick={onConfirm}
+          variant="contained"
+          color={confirmColor}
+          sx={{ textTransform: 'none' }}
+        >
+          {confirmText}
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
+export default ConfirmDialog;
+```
+
+## 5. CheckpointDialog.js (If you still need it for view-only)
+
+```javascript
+import React from 'react';
+import {
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Button,
+  Typography,
+  Box,
+  Grid,
+  Chip
+} from '@mui/material';
+import {
+  CheckBox as CheckBoxIcon,
+  CheckBoxOutlineBlank as CheckBoxOutlineBlankIcon
+} from '@mui/icons-material';
+
+function CheckpointDialog({
+  open,
+  onClose,
+  checkpoint = null,
+  mode = 'view'
+}) {
+  if (!checkpoint) return null;
+
+  return (
+    <Dialog
+      open={open}
+      onClose={onClose}
+      maxWidth="md"
+      fullWidth
+      PaperProps={{
+        sx: { borderRadius: 2 }
+      }}
+    >
+      <DialogTitle sx={{ fontWeight: 'bold', borderBottom: '1px solid #e0e0e0' }}>
+        Checkpoint Details
+      </DialogTitle>
+      
+      <DialogContent sx={{ p: 3 }}>
+        <Grid container spacing={3}>
+          <Grid item xs={12} md={6}>
+            <Typography variant="subtitle2" sx={{ color: '#666', mb: 1 }}>
+              Checkpoint Name
+            </Typography>
+            <Typography sx={{ fontWeight: 'medium', mb: 2 }}>
+              {checkpoint.checkpoint || checkpoint.name}
+            </Typography>
+          </Grid>
+          
+          <Grid item xs={12} md={6}>
+            <Typography variant="subtitle2" sx={{ color: '#666', mb: 1 }}>
+              Date
+            </Typography>
+            <Typography sx={{ mb: 2 }}>
+              {new Date(checkpoint.date).toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+              })}
+            </Typography>
+          </Grid>
+          
+          <Grid item xs={12}>
+            <Typography variant="subtitle2" sx={{ color: '#666', mb: 1 }}>
+              Todos
+            </Typography>
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 2 }}>
+              {checkpoint.todos && checkpoint.todos.map((todo, index) => (
+                <Chip
+                  key={index}
+                  icon={typeof todo === 'object' && todo.completed ? 
+                    <CheckBoxIcon fontSize="small" /> : 
+                    <CheckBoxOutlineBlankIcon fontSize="small" />
+                  }
+                  label={typeof todo === 'object' ? todo.text : todo}
+                  size="small"
+                  sx={{ 
+                    backgroundColor: 'rgba(25, 118, 210, 0.08)',
+                    '& .MuiChip-icon': { color: '#1976d2' }
+                  }}
+                />
+              ))}
+            </Box>
+          </Grid>
+        </Grid>
+      </DialogContent>
+      
+      <DialogActions sx={{ borderTop: '1px solid #e0e0e0', p: 2 }}>
+        <Button onClick={onClose} sx={{ textTransform: 'none' }}>
+          Close
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
+export default CheckpointDialog;
+```
+
+This solution provides:
+
+1. **Todo Preview cards** with edit/delete icons inside
+2. **No file column** in main table - files only show in View popup
+3. **Edit functionality integrated** directly into CheckpointTable.js
+4. **File preview with view icon only** (no download)
+5. **Clean MUI v5 implementation** with no external EditPopup.js
+-------------------------------------------------------------------------form.js
+
+import React, { useState } from 'react';
+import {
+  Card,
+  CardContent,
+  Typography,
+  TextField,
+  Button,
+  Grid,
+  Box,
+  IconButton,
+  Chip,
+  InputAdornment,
+  Stack,
+  Paper
+} from '@mui/material';
+import {
+  Add as AddIcon,
+  Visibility as ViewIcon,
+  Edit as EditIcon,
+  Delete as DeleteIcon,
+  AttachFile as AttachFileIcon,
+  Clear as ClearIcon,
+  InsertDriveFile as FileIcon
+} from '@mui/icons-material';
+import FileViewerDialog from './FileViewerDialog';
+
+function CheckpointForm({ onSave }) {
+  const [formData, setFormData] = useState({
+    name: '',
+    date: '',
+    todos: [],
+    todoInput: '',
+    files: []
+  });
+  const [fileViewerOpen, setFileViewerOpen] = useState(false);
+  const [selectedFile, setSelectedFile] = useState({ url: '', name: '' });
+
+  const handleAddTodo = () => {
+    if (!formData.todoInput.trim()) return;
+    const newTodo = {
+      id: Date.now(),
+      text: formData.todoInput,
+      completed: false
+    };
+    setFormData(prev => ({
+      ...prev,
+      todos: [...prev.todos, newTodo],
+      todoInput: ''
+    }));
+  };
+
+  const handleKeyPress = (e) => {
+    if (e.key === 'Enter') {
+      handleAddTodo();
+    }
+  };
+
+  const handleFileUpload = (e) => {
+    const files = Array.from(e.target.files);
+    setFormData(prev => ({
+      ...prev,
+      files: [...prev.files, ...files.map(file => ({
+        name: file.name,
+        type: file.type,
+        size: file.size,
+        file: file
+      }))]
+    }));
+  };
+
+  const handleClear = () => {
+    setFormData({
+      name: '',
+      date: '',
+      todos: [],
+      todoInput: '',
+      files: []
+    });
+  };
+
+  const handleSubmit = () => {
+    if (!formData.name.trim() || !formData.date.trim()) {
+      alert('Please fill in Checkpoint Name and Date');
+      return;
+    }
+    onSave(formData);
+    handleClear();
+  };
+
+  const handleRemoveTodo = (index) => {
+    const updatedTodos = [...formData.todos];
+    updatedTodos.splice(index, 1);
+    setFormData(prev => ({ ...prev, todos: updatedTodos }));
+  };
+
+  const handleRemoveFile = (index) => {
+    const updatedFiles = [...formData.files];
+    updatedFiles.splice(index, 1);
+    setFormData(prev => ({ ...prev, files: updatedFiles }));
+  };
+
+  const handleEditTodo = (index) => {
+    const todoText = prompt('Edit todo:', formData.todos[index].text);
+    if (todoText !== null) {
+      const updatedTodos = [...formData.todos];
+      updatedTodos[index].text = todoText;
+      setFormData(prev => ({ ...prev, todos: updatedTodos }));
+    }
+  };
+
+  const handlePreviewFile = (file, index) => {
+    const fileUrl = URL.createObjectURL(file.file);
+    setSelectedFile({
+      url: fileUrl,
+      name: file.name
+    });
+    setFileViewerOpen(true);
+  };
+
+  const handleCloseFileViewer = () => {
+    if (selectedFile.url) {
+      URL.revokeObjectURL(selectedFile.url);
+    }
+    setFileViewerOpen(false);
+    setSelectedFile({ url: '', name: '' });
+  };
+
+  return (
+    <>
+      <Card sx={{ mb: 4, borderRadius: 2 }}>
+        <CardContent sx={{ p: 3 }}>
+          <Typography variant="h6" gutterBottom sx={{ fontWeight: 'bold', mb: 3 }}>
+            Add New Checkpoint
+          </Typography>
+          
+          <Stack direction="row" spacing={2} alignItems="flex-start" sx={{ mb: 3 }}>
+            <Box sx={{ flex: 1, minWidth: 150 }}>
+              <Typography variant="caption" display="block" gutterBottom sx={{ fontWeight: 'bold' }}>
+                Checkpoint Name *
+              </Typography>
+              <TextField
+                fullWidth
+                placeholder="Enter name"
+                value={formData.name}
+                onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                size="small"
+                sx={{ backgroundColor: 'white' }}
+              />
+            </Box>
+
+            <Box sx={{ flex: 1, minWidth: 150 }}>
+              <Typography variant="caption" display="block" gutterBottom sx={{ fontWeight: 'bold' }}>
+                Date *
+              </Typography>
+              <TextField
+                fullWidth
+                type="date"
+                value={formData.date}
+                onChange={(e) => setFormData(prev => ({ ...prev, date: e.target.value }))}
+                size="small"
+                sx={{ backgroundColor: 'white' }}
+                InputLabelProps={{ shrink: true }}
+              />
+            </Box>
+
+            <Box sx={{ flex: 2, minWidth: 200 }}>
+              <Typography variant="caption" display="block" gutterBottom sx={{ fontWeight: 'bold' }}>
+                Add Todos *
+              </Typography>
+              <TextField
+                fullWidth
+                placeholder="Enter todo item"
+                value={formData.todoInput}
+                onChange={(e) => setFormData(prev => ({ ...prev, todoInput: e.target.value }))}
+                onKeyPress={handleKeyPress}
+                size="small"
+                sx={{ backgroundColor: 'white' }}
+                InputProps={{
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <IconButton 
+                        onClick={handleAddTodo} 
+                        size="small"
+                        sx={{ 
+                          backgroundColor: '#1976d2',
+                          color: 'white',
+                          '&:hover': {
+                            backgroundColor: '#1565c0'
+                          }
+                        }}
+                      >
+                        <AddIcon fontSize="small" />
+                      </IconButton>
+                    </InputAdornment>
+                  )
+                }}
+              />
+            </Box>
+
+            <Box sx={{ flex: 1, minWidth: 150 }}>
+              <Typography variant="caption" display="block" gutterBottom sx={{ fontWeight: 'bold' }}>
+                Upload Files (Optional)
+              </Typography>
+              <Button
+                variant="outlined"
+                component="label"
+                startIcon={<AttachFileIcon />}
+                size="small"
+                fullWidth
+                sx={{ 
+                  backgroundColor: 'white',
+                  justifyContent: 'flex-start',
+                  textTransform: 'none'
+                }}
+              >
+                SELECT FILES
+                <input
+                  type="file"
+                  hidden
+                  multiple
+                  onChange={handleFileUpload}
+                />
+              </Button>
+            </Box>
+
+            <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', pt: 2 }}>
+              <Button
+                variant="outlined"
+                onClick={handleClear}
+                sx={{ textTransform: 'none' }}
+                startIcon={<ClearIcon />}
+              >
+                Clear
+              </Button>
+              <Button
+                variant="contained"
+                onClick={handleSubmit}
+                sx={{ textTransform: 'none' }}
+              >
+                Save
+              </Button>
+            </Box>
+          </Stack>
+
+          {formData.todos.length > 0 && (
+            <Paper elevation={0} sx={{ p: 2, mb: 2, backgroundColor: '#f8f9fa', borderRadius: 1 }}>
+              <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 'bold', color: '#555' }}>
+                Todo Preview
+              </Typography>
+              <Grid container spacing={1}>
+                {formData.todos.map((todo, index) => (
+                  <Grid item xs={12} sm={6} md={4} key={todo.id}>
+                    <Paper 
+                      elevation={0} 
+                      sx={{ 
+                        p: 2, 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        justifyContent: 'space-between',
+                        backgroundColor: 'white',
+                        border: '1px solid #e0e0e0',
+                        borderRadius: 1
+                      }}
+                    >
+                      <Typography variant="body2" sx={{ fontWeight: 'medium' }}>
+                        {todo.text}
+                      </Typography>
+                      <Box sx={{ display: 'flex', gap: 0.5 }}>
+                        <IconButton 
+                          size="small" 
+                          onClick={() => handleEditTodo(index)}
+                          sx={{ color: '#4caf50' }}
+                        >
+                          <EditIcon fontSize="small" />
+                        </IconButton>
+                        <IconButton 
+                          size="small" 
+                          onClick={() => handleRemoveTodo(index)}
+                          sx={{ color: '#f44336' }}
+                        >
+                          <DeleteIcon fontSize="small" />
+                        </IconButton>
+                      </Box>
+                    </Paper>
+                  </Grid>
+                ))}
+              </Grid>
+            </Paper>
+          )}
+
+          {formData.files.length > 0 && (
+            <Paper elevation={0} sx={{ p: 2, backgroundColor: '#f8f9fa', borderRadius: 1 }}>
+              <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 'bold', color: '#555' }}>
+                File Preview
+              </Typography>
+              <Grid container spacing={1}>
+                {formData.files.map((file, index) => (
+                  <Grid item xs={12} sm={6} md={4} key={index}>
+                    <Paper 
+                      elevation={0} 
+                      sx={{ 
+                        p: 1.5, 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        justifyContent: 'space-between',
+                        backgroundColor: 'white',
+                        border: '1px solid #e0e0e0',
+                        borderRadius: 1
+                      }}
+                    >
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <FileIcon fontSize="small" sx={{ color: '#666' }} />
+                        <Typography variant="body2" noWrap sx={{ maxWidth: 150 }}>
+                          {file.name}
+                        </Typography>
+                      </Box>
+                      <Box sx={{ display: 'flex', gap: 0.5 }}>
+                        <IconButton 
+                          size="small" 
+                          onClick={() => handlePreviewFile(file, index)}
+                          sx={{ color: '#2196f3' }}
+                        >
+                          <ViewIcon fontSize="small" />
+                        </IconButton>
+                        <IconButton 
+                          size="small" 
+                          onClick={() => handleRemoveFile(index)}
+                          sx={{ color: '#f44336' }}
+                        >
+                          <DeleteIcon fontSize="small" />
+                        </IconButton>
+                      </Box>
+                    </Paper>
+                  </Grid>
+                ))}
+              </Grid>
+            </Paper>
+          )}
+        </CardContent>
+      </Card>
+
+      <FileViewerDialog
+        open={fileViewerOpen}
+        onClose={handleCloseFileViewer}
+        fileUrl={selectedFile.url}
+        fileName={selectedFile.name}
+      />
+    </>
+  );
+}
+
+export default CheckpointForm;
+----------------------------------controller
+const Checkpoint = require("../models/Checkpoint");
+const fs = require("fs");
+const path = require("path");
+
+// CREATE CHECKPOINT
+exports.createCheckpoint = async (req, res) => {
+  try {
+    const { checkpoint, date, todos } = req.body;
+    console.log("📥 Creating checkpoint:", { checkpoint, date });
+
+    if (!checkpoint || !date) {
+      return res.status(400).json({ 
+        success: false,
+        error: "Checkpoint name and date are required" 
+      });
+    }
+
+    // Parse todos
+    let todoList = [];
+    if (todos) {
+      try {
+        todoList = JSON.parse(todos);
+      } catch (e) {
+        todoList = typeof todos === 'string' ? [todos] : todos;
+      }
+    }
+
+    // Handle files
+    const files = req.files ? req.files.map(file => ({
+      filename: file.filename,
+      originalname: file.originalname,
+      mimetype: file.mimetype,
+      size: file.size
+    })) : [];
+
+    const newCheckpoint = new Checkpoint({
+      checkpoint,
+      date: new Date(date),
+      todos: todoList,
+      files
+    });
+
+    await newCheckpoint.save();
+    
+    console.log("✅ Checkpoint saved to MongoDB:", newCheckpoint._id);
+    
+    res.status(201).json({
+      success: true,
+      message: "Checkpoint created successfully",
+      data: newCheckpoint
+    });
+  } catch (err) {
+    console.error("❌ Create Error:", err);
+    res.status(500).json({ 
+      success: false,
+      error: err.message 
+    });
+  }
+};
+
+// GET ALL CHECKPOINTS
+exports.getCheckpoints = async (req, res) => {
+  try {
+    const checkpoints = await Checkpoint.find().sort({ createdAt: -1 });
+    res.json({
+      success: true,
+      count: checkpoints.length,
+      data: checkpoints
+    });
+  } catch (err) {
+    console.error("❌ Get All Error:", err);
+    res.status(500).json({ 
+      success: false,
+      error: err.message 
+    });
+  }
+};
+
+// GET SINGLE CHECKPOINT
+exports.getCheckpointById = async (req, res) => {
+  try {
+    const checkpoint = await Checkpoint.findById(req.params.id);
+    if (!checkpoint) {
+      return res.status(404).json({ 
+        success: false,
+        error: "Checkpoint not found" 
+      });
+    }
+    res.json({
+      success: true,
+      data: checkpoint
+    });
+  } catch (err) {
+    console.error("❌ Get By ID Error:", err);
+    res.status(500).json({ 
+      success: false,
+      error: err.message 
+    });
+  }
+};
+
+// UPDATE CHECKPOINT
+exports.updateCheckpoint = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { checkpoint, date, todos, existingFiles } = req.body;
+    
+    console.log("✏️ Updating checkpoint:", id);
+
+    const currentCheckpoint = await Checkpoint.findById(id);
+    if (!currentCheckpoint) {
+      return res.status(404).json({ 
+        success: false,
+        error: "Checkpoint not found" 
+      });
+    }
+
+    // Parse todos
+    let todoList = [];
+    if (todos) {
+      try {
+        todoList = JSON.parse(todos);
+      } catch (e) {
+        todoList = typeof todos === 'string' ? [todos] : todos;
+      }
+    }
+
+    // Handle existing files
+    let filesToKeep = [];
+    if (existingFiles) {
+      try {
+        filesToKeep = JSON.parse(existingFiles);
+      } catch (e) {
+        filesToKeep = existingFiles;
+      }
+    }
+
+    // Handle new files
+    const newFiles = req.files ? req.files.map(file => ({
+      filename: file.filename,
+      originalname: file.originalname,
+      mimetype: file.mimetype,
+      size: file.size
+    })) : [];
+
+    // Combine files
+    const allFiles = [...filesToKeep, ...newFiles];
+
+    const updatedCheckpoint = await Checkpoint.findByIdAndUpdate(
+      id,
+      {
+        checkpoint: checkpoint || currentCheckpoint.checkpoint,
+        date: date ? new Date(date) : currentCheckpoint.date,
+        todos: todoList.length > 0 ? todoList : currentCheckpoint.todos,
+        files: allFiles
+      },
+      { new: true, runValidators: true }
+    );
+
+    res.json({
+      success: true,
+      message: "Checkpoint updated successfully",
+      data: updatedCheckpoint
+    });
+  } catch (err) {
+    console.error("❌ Update Error:", err);
+    res.status(500).json({ 
+      success: false,
+      error: err.message 
+    });
+  }
+};
+
+// DELETE CHECKPOINT
+exports.deleteCheckpoint = async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const checkpoint = await Checkpoint.findById(id);
+    if (!checkpoint) {
+      return res.status(404).json({ 
+        success: false,
+        error: "Checkpoint not found" 
+      });
+    }
+
+    // Delete associated files from uploads folder
+    if (checkpoint.files && checkpoint.files.length > 0) {
+      checkpoint.files.forEach(file => {
+        const filePath = path.join(__dirname, '../uploads', file.filename);
+        if (fs.existsSync(filePath)) {
+          fs.unlinkSync(filePath);
+        }
+      });
+    }
+
+    await Checkpoint.findByIdAndDelete(id);
+    
+    res.json({
+      success: true,
+      message: "Checkpoint deleted successfully"
+    });
+  } catch (err) {
+    console.error("❌ Delete Error:", err);
+    res.status(500).json({ 
+      success: false,
+      error: err.message 
+    });
+  }
+};
+
+// DELETE FILE
+exports.deleteFile = async (req, res) => {
+  try {
+    const { checkpointId, filename } = req.params;
+    
+    const checkpoint = await Checkpoint.findById(checkpointId);
+    if (!checkpoint) {
+      return res.status(404).json({ 
+        success: false,
+        error: "Checkpoint not found" 
+      });
+    }
+
+    // Remove file from array
+    checkpoint.files = checkpoint.files.filter(file => file.filename !== filename);
+    await checkpoint.save();
+
+    // Delete file from uploads folder
+    const filePath = path.join(__dirname, '../uploads', filename);
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+    }
+
+    res.json({
+      success: true,
+      message: "File deleted successfully",
+      data: checkpoint
+    });
+  } catch (err) {
+    console.error("❌ Delete File Error:", err);
+    res.status(500).json({ 
+      success: false,
+      error: err.message 
+    });
+  }
+};
+-----------------------------------------routes
+
+const express = require("express");
+const router = express.Router();
+const checkpointController = require("../controllers/checkpointController");
+const multer = require("multer");
+const path = require("path");
+
+// Configure multer for file uploads
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, path.join(__dirname, '../uploads/'));
+  },
+  filename: function (req, file, cb) {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, uniqueSuffix + path.extname(file.originalname));
+  }
+});
+
+const upload = multer({ 
+  storage: storage,
+  limits: { fileSize: 10 * 1024 * 1024 } // 10MB limit
+});
+
+// Routes
+router.post("/", upload.array('files'), checkpointController.createCheckpoint);
+router.get("/", checkpointController.getCheckpoints);
+router.get("/:id", checkpointController.getCheckpointById);
+router.put("/:id", upload.array('files'), checkpointController.updateCheckpoint);
+router.delete("/:checkpointId/file/:filename", checkpointController.deleteFile);
+router.delete("/:id", checkpointController.deleteCheckpoint);
+
+module.exports = router;
+-----------------------------------

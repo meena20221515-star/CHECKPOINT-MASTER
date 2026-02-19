@@ -1,0 +1,131 @@
+import { Container, Typography } from "@mui/material";
+import { useEffect, useState } from "react";
+import axios from "axios";
+import ClientForm from "../components/ClientForm";
+import ClientTable from "../components/ClientTable";
+import SearchBar from "../components/SearchBar";
+
+export default function ClientGroupingMaster() {
+  const [rows, setRows] = useState([]);
+  const [search, setSearch] = useState("");
+
+  useEffect(() => {
+    axios.get("http://localhost:5000/api/clients")
+      .then(r => setRows(r.data));
+  }, []);
+
+  const filtered = rows.filter(r =>
+    r.clientName.toLowerCase().includes(search.toLowerCase()) ||
+    r.task.toLowerCase().includes(search.toLowerCase())
+  );
+
+  return (
+    <Container>
+      <Typography variant="h4" align="center" my={3} color="primary">
+        Client Grouping Master
+      </Typography>
+      <ClientForm onSubmit={r => setRows(p => [...p, r])} />
+      <SearchBar search={search} setSearch={setSearch} />
+      <ClientTable rows={filtered} setRows={setRows} />
+    </Container>
+  );
+}
+
+
+import { TextField } from "@mui/material";
+
+export default ({ search, setSearch }) => (
+  <TextField
+    placeholder="Search..."
+    value={search}
+    onChange={e => setSearch(e.target.value)}
+    sx={{ mb: 2, width: 300 }}
+  />
+);
+
+
+
+
+
+const mongoose = require("mongoose");
+
+const ClientSchema = new mongoose.Schema(
+  {
+    clientName: { type: String, required: true },
+    task: { type: String, required: true },
+    date: { type: String, required: true },
+    file: String
+  },
+  { timestamps: true }
+);
+
+ClientSchema.index(
+  { clientName: 1, task: 1, date: 1 },
+  { unique: true }
+);
+
+module.exports = mongoose.model("Client", ClientSchema);
+
+
+
+
+
+import axios from "axios";
+import { Button, Stack, TextField } from "@mui/material";
+import { useState } from "react";
+
+export default function ClientForm({ onSubmit }) {
+  const [clientName, setClientName] = useState("");
+  const [task, setTask] = useState("");
+  const [date, setDate] = useState("");
+  const [file, setFile] = useState(null);
+
+  const submit = async () => {
+    if (!clientName || !task || !date) {
+      alert("All fields required");
+      return;
+    }
+
+    try {
+      const fd = new FormData();
+      fd.append("clientName", clientName);
+      fd.append("task", task);
+      fd.append("date", date);
+      if (file) fd.append("file", file);
+
+      const res = await axios.post(
+        "http://localhost:5000/api/clients",
+        fd
+      );
+
+      onSubmit(res.data);
+      setClientName("");
+      setTask("");
+      setDate("");
+      setFile(null);
+    } catch (err) {
+      console.error(err);
+      alert("Save failed (backend error)");
+    }
+  };
+
+  return (
+    <Stack direction="row" spacing={2} mb={2}>
+      <TextField label="Client Name" value={clientName}
+        onChange={e => setClientName(e.target.value)} />
+      <TextField label="Task" value={task}
+        onChange={e => setTask(e.target.value)} />
+      <TextField type="date" InputLabelProps={{ shrink: true }}
+        value={date} onChange={e => setDate(e.target.value)} />
+      <Button component="label">
+        Upload
+        <input hidden type="file" onChange={e => setFile(e.target.files[0])} />
+      </Button>
+      <Button variant="contained" onClick={submit}>Save</Button>
+    </Stack>
+  );
+}
+
+
+
+WHY NOT working this functions update and save is not working give every actions working properly

@@ -1,0 +1,682 @@
+   import React, { useState, useEffect } from "react";
+import { Container, Typography } from "@mui/material";
+
+// Updated component imports
+import ClientForm from "../components/ClientForm";
+import SearchBar from "../components/SearchBar";
+import ClientTable from "../components/ClientTable";
+
+import axios from "axios";
+
+export default function ClientGroupingMaster() {
+    const [rows, setRows] = useState([]);
+    const [search, setSearch] = useState("");
+
+    // Fetch clients on mount
+    useEffect(() => {
+        const fetchClients = async () => {
+            try {
+                const res = await axios.get("http://localhost:5000/api/clients");
+                setRows(res.data);
+            } catch (err) {
+                console.error(err);
+            }
+        };
+        fetchClients();
+    }, []);
+
+    // ADD row
+    const handleSubmit = (row) => {
+        setRows((prev) => [...prev, row]);
+    };
+
+    const filteredRows = rows.filter(
+        (r) =>
+            r.name.toLowerCase().includes(search.toLowerCase()) ||
+            r.todo.toLowerCase().includes(search.toLowerCase())
+    );
+
+    return (
+        <Container maxWidth="lg">
+            <Typography variant="h5" align="center" sx={{ my: 2 }}>
+                Client Grouping Master
+            </Typography>
+
+            <ClientForm onSubmit={handleSubmit} />
+            <SearchBar search={search} setSearch={setSearch} />
+            <ClientTable rows={filteredRows} setRows={setRows} />
+        </Container>
+    );
+}
+     
+
+---------------------------------------------------------------------
+
+
+import React, { useState } from "react";
+import axios from "axios";
+import {
+    Stack,
+    TextField,
+    Button,
+    IconButton,
+    Typography,
+    Paper
+} from "@mui/material";
+
+import AddCircleIcon from "@mui/icons-material/AddCircle";
+import EditIcon from "@mui/icons-material/Edit";
+import DeleteIcon from "@mui/icons-material/Delete";
+import UploadFileIcon from "@mui/icons-material/UploadFile";
+import VisibilityIcon from "@mui/icons-material/Visibility";
+
+export default function ClientForm({ onSubmit }) {
+    const [name, setName] = useState("");
+    const [date, setDate] = useState("");
+    const [todoInput, setTodoInput] = useState("");
+    const [file, setFile] = useState(null);
+    const [tempTodos, setTempTodos] = useState([]);
+    const [editingIndex, setEditingIndex] = useState(null);
+    const [editingValue, setEditingValue] = useState("");
+
+    // Add todo
+    const handleAddTodo = () => {
+        if (!todoInput.trim()) return;
+        setTempTodos([...tempTodos, todoInput.trim()]);
+        setTodoInput("");
+    };
+
+    // Cancel form
+    const handleCancel = () => {
+        setName("");
+        setDate("");
+        setTodoInput("");
+        setTempTodos([]);
+        setFile(null);
+        setEditingIndex(null);
+        setEditingValue("");
+    };
+
+    // File select
+    const handleFileChange = (e) => {
+        const selected = e.target.files[0];
+        if (!selected) return;
+        if (selected.size > 5 * 1024 * 1024) {
+            alert("File must be under 5MB");
+            return;
+        }
+        setFile(selected);
+    };
+
+    // Submit form
+    const handleSubmit = async () => {
+        if (!name || !date || tempTodos.length === 0) {
+            alert("Please fill all required fields");
+            return;
+        }
+
+        try {
+            for (const todo of tempTodos) {
+                const formData = new FormData();
+                formData.append("name", name);
+                formData.append("date", date);
+                formData.append("todo", todo);
+                if (file) formData.append("file", file);
+
+                const res = await axios.post(
+                    "http://localhost:5000/api/clients",
+                    formData,
+                    { headers: { "Content-Type": "multipart/form-data" } }
+                );
+                onSubmit(res.data);
+            }
+            handleCancel();
+        } catch (err) {
+            console.error(err);
+            if (err.response?.status === 409) {
+                alert("This client already exists!");
+            } else {
+                alert("Failed to submit client");
+            }
+        }
+    };
+
+    return (
+        <>
+            {/* FORM INPUTS */}
+            <Stack direction="row" spacing={2} mb={2}>
+                <TextField
+                    label="Name"
+                    size="small"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                />
+                <TextField
+                    label="Todo"
+                    size="small"
+                    value={todoInput}
+                    onChange={(e) => setTodoInput(e.target.value)}
+                />
+                <TextField
+                    type="date"
+                    size="small"
+                    InputLabelProps={{ shrink: true }}
+                    value={date}
+                    onChange={(e) => setDate(e.target.value)}
+                />
+                <IconButton color="success" onClick={handleAddTodo}>
+                    <AddCircleIcon />
+                </IconButton>
+            </Stack>
+
+            {/* TODO PREVIEW */}
+            {tempTodos.length > 0 && (
+                <Paper sx={{ p: 2, mb: 2, width: 400 }}>
+                    <Typography variant="subtitle2">Todo Preview</Typography>
+                    {tempTodos.map((todo, index) => (
+                        <Stack
+                            key={index}
+                            direction="row"
+                            justifyContent="space-between"
+                            alignItems="center"
+                            sx={{ mt: 1 }}
+                        >
+                            {editingIndex === index ? (
+                                <TextField
+                                    size="small"
+                                    value={editingValue}
+                                    onChange={(e) => setEditingValue(e.target.value)}
+                                />
+                            ) : (
+                                <Typography>{todo}</Typography>
+                            )}
+                            <Stack direction="row">
+                                {editingIndex === index ? (
+                                    <>
+                                        <IconButton
+                                            color="success"
+                                            onClick={() => {
+                                                const updated = [...tempTodos];
+                                                updated[index] = editingValue.trim();
+                                                setTempTodos(updated);
+                                                setEditingIndex(null);
+                                                setEditingValue("");
+                                            }}
+                                        >
+                                            <EditIcon />
+                                        </IconButton>
+                                        <IconButton
+                                            color="warning"
+                                            onClick={() => setEditingIndex(null)}
+                                        >
+                                            <DeleteIcon />
+                                        </IconButton>
+                                    </>
+                                ) : (
+                                    <>
+                                        <IconButton
+                                            color="primary"
+                                            onClick={() => {
+                                                setEditingIndex(index);
+                                                setEditingValue(todo);
+                                            }}
+                                        >
+                                            <EditIcon />
+                                        </IconButton>
+                                        <IconButton
+                                            color="error"
+                                            onClick={() =>
+                                                setTempTodos(tempTodos.filter((_, i) => i !== index))
+                                            }
+                                        >
+                                            <DeleteIcon />
+                                        </IconButton>
+                                    </>
+                                )}
+                            </Stack>
+                        </Stack>
+                    ))}
+                </Paper>
+            )}
+
+            {/* FILE + ACTIONS */}
+            <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 3 }}>
+                <Button
+                    variant="contained"
+                    component="label"
+                    startIcon={<UploadFileIcon />}
+                >
+                    Upload
+                    <input hidden type="file" onChange={handleFileChange} />
+                </Button>
+                {file && (
+                    <Stack direction="row" spacing={1} alignItems="center">
+                        <Typography variant="body2">{file.name}</Typography>
+                        <IconButton
+                            color="primary"
+                            onClick={() => window.open(URL.createObjectURL(file))}
+                        >
+                            <VisibilityIcon />
+                        </IconButton>
+                        <IconButton color="error" onClick={() => setFile(null)}>
+                            <DeleteIcon />
+                        </IconButton>
+                    </Stack>
+                )}
+                <Button variant="contained" onClick={handleSubmit}>
+                    Submit
+                </Button>
+                <Button variant="outlined" color="error" onClick={handleCancel}>
+                    Cancel
+                </Button>
+            </Stack>
+        </>
+    );
+}
+
+------------------------------------------------------------------
+app.js
+
+   import { BrowserRouter, Routes, Route } from "react-router-dom";
+import ClientGroupingMaster from "./pages/ClientGroupingMaster";
+
+function App() {
+    return (
+        <BrowserRouter>
+            <Routes>
+                <Route path="/" element={<ClientGroupingMaster />} />
+            </Routes>
+        </BrowserRouter>
+    );
+}
+
+export default App;
+-------------------------------------------------------
+    index.js
+  
+  import React from "react";
+import ReactDOM from "react-dom/client";
+import { ThemeProvider } from "@mui/material";
+import App from "./App";
+import theme from "./theme";
+
+ReactDOM.createRoot(document.getElementById("root")).render(
+  <ThemeProvider theme={theme}>
+    <App />
+  </ThemeProvider>
+);
+
+-----------------------------------------------------
+theme.js
+ import { createTheme } from "@mui/material/styles";
+
+export default createTheme({
+  palette: {
+    primary: { main: "#00897B" },
+    secondary: { main: "#004D40" }
+  }
+});
+
+-------------------------------------------------------------
+server.js
+  const express = require("express");
+const cors = require("cors");
+const path = require("path");
+const connectDB = require("./config/db");
+
+const clientRoutes = require("./routes/ClientRoutes"); // OR clientRouter
+
+const app = express();
+
+connectDB();
+
+app.use(cors());
+app.use(express.json());
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+
+app.use("/api/clients", clientRoutes);
+
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () =>
+    console.log(`Server running on port ${PORT}`)
+);
+
+----------------------------------------------------------
+ clientdialog.js
+   
+   import React, { useState, useEffect } from "react";
+import {
+    Dialog,
+    DialogTitle,
+    DialogContent,
+    DialogActions,
+    Button,
+    TextField,
+    Stack,
+    IconButton,
+    Typography
+} from "@mui/material";
+import VisibilityIcon from "@mui/icons-material/Visibility";
+
+export default function ClientDialog({ open, onClose, data, mode, onSave }) {
+    const [form, setForm] = useState({
+        name: "",
+        date: "",
+        todo: "",
+        file: null,
+        fileName: ""
+    });
+
+    useEffect(() => {
+        if (data) {
+            setForm({
+                name: data.name || "",
+                date: data.date || "",
+                todo: data.todo || "",
+                file: null,
+                fileName: data.file || ""
+            });
+        }
+    }, [data]);
+
+    const handleSave = () => {
+        const fd = new FormData();
+        fd.append("name", form.name);
+        fd.append("date", form.date);
+        fd.append("todo", form.todo);
+        if (form.file) fd.append("file", form.file);
+        onSave(fd, data._id);
+        onClose();
+    };
+
+    return (
+        <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
+            <DialogTitle>
+                {mode === "edit" ? "Edit Client" : "View Client"}
+            </DialogTitle>
+            <DialogContent>
+                <Stack spacing={2} sx={{ mt: 2 }}>
+                    {/* Name */}
+                    <Stack direction="row" spacing={2}>
+                        <Typography sx={{ width: 100 }} color="text.secondary">
+                            Name:
+                        </Typography>
+                        {mode === "edit" ? (
+                            <TextField
+                                fullWidth
+                                value={form.name}
+                                onChange={e => setForm({ ...form, name: e.target.value })}
+                            />
+                        ) : (
+                            <Typography>{form.name}</Typography>
+                        )}
+                    </Stack>
+
+                    {/* Date */}
+                    <Stack direction="row" spacing={2}>
+                        <Typography sx={{ width: 100 }} color="text.secondary">
+                            Date:
+                        </Typography>
+                        {mode === "edit" ? (
+                            <TextField
+                                type="date"
+                                fullWidth
+                                value={form.date}
+                                onChange={e => setForm({ ...form, date: e.target.value })}
+                            />
+                        ) : (
+                            <Typography>{form.date}</Typography>
+                        )}
+                    </Stack>
+
+                    {/* Todo */}
+                    <Stack direction="row" spacing={2}>
+                        <Typography sx={{ width: 100 }} color="text.secondary">
+                            Todo:
+                        </Typography>
+                        {mode === "edit" ? (
+                            <TextField
+                                fullWidth
+                                value={form.todo}
+                                onChange={e => setForm({ ...form, todo: e.target.value })}
+                            />
+                        ) : (
+                            <Typography>{form.todo}</Typography>
+                        )}
+                    </Stack>
+
+                    {/* File */}
+                    <Stack direction="row" spacing={2} alignItems="flex-start">
+                        <Typography sx={{ width: 100 }} color="text.secondary">
+                            File:
+                        </Typography>
+                        {mode === "edit" ? (
+                            <Stack spacing={1}>
+                                {/* Existing file */}
+                                {form.fileName ? (
+                                    <Stack direction="row" spacing={1} alignItems="center">
+                                        <Typography>{form.fileName}</Typography>
+                                        <IconButton
+                                            size="small"
+                                            color="primary"
+                                            onClick={() =>
+                                                window.open(
+                                                    `http://localhost:5000/uploads/${form.fileName}`,
+                                                    "_blank"
+                                                )
+                                            }
+                                        >
+                                            <VisibilityIcon />
+                                        </IconButton>
+                                    </Stack>
+                                ) : (
+                                    <Typography>No file uploaded</Typography>
+                                )}
+
+                                {/* Upload new file */}
+                                <Button component="label" variant="outlined" size="small">
+                                    Upload New File
+                                    <input
+                                        hidden
+                                        type="file"
+                                        onChange={e =>
+                                            setForm({ ...form, file: e.target.files[0] })
+                                        }
+                                    />
+                                </Button>
+
+                                {/* New file preview */}
+                                {form.file && (
+                                    <Stack direction="row" spacing={1} alignItems="center">
+                                        <Typography variant="body2">
+                                            New File: {form.file.name}
+                                        </Typography>
+                                        <IconButton
+                                            size="small"
+                                            color="primary"
+                                            onClick={() =>
+                                                window.open(URL.createObjectURL(form.file), "_blank")
+                                            }
+                                        >
+                                            <VisibilityIcon />
+                                        </IconButton>
+                                    </Stack>
+                                )}
+                            </Stack>
+                        ) : form.fileName ? (
+                            <Stack direction="row" spacing={1} alignItems="center">
+                                <Typography>{form.fileName}</Typography>
+                                <IconButton
+                                    size="small"
+                                    color="primary"
+                                    onClick={() =>
+                                        window.open(
+                                            `http://localhost:5000/uploads/${form.fileName}`,
+                                            "_blank"
+                                        )
+                                    }
+                                >
+                                    <VisibilityIcon />
+                                </IconButton>
+                            </Stack>
+                        ) : (
+                            <Typography>No file uploaded</Typography>
+                        )}
+                    </Stack>
+                </Stack>
+            </DialogContent>
+            <DialogActions>
+                {mode === "edit" && (
+                    <Button variant="contained" onClick={handleSave}>
+                        Save
+                    </Button>
+                )}
+                <Button variant="outlined" onClick={onClose}>
+                    Close
+                </Button>
+            </DialogActions>
+        </Dialog>
+    );
+}
+-------------------------------------------------
+clientroutes
+
+        const express = require("express");
+const multer = require("multer");
+const {
+    createClient,
+    getClients,
+    updateClient,
+    deleteClient
+} = require("../controllers/clientController");
+
+const router = express.Router();
+
+/* Multer config */
+const storage = multer.diskStorage({
+    destination: "uploads/",
+    filename: (req, file, cb) => {
+        cb(null, Date.now() + "-" + file.originalname);
+    }
+});
+
+const upload = multer({ storage });
+
+// ROUTES
+router.post("/", upload.single("file"), createClient);
+router.get("/", getClients);
+router.put("/:id", upload.single("file"), updateClient);
+router.delete("/:id", deleteClient);
+
+module.exports = router;
+  
+
+-----------------------------------------
+clienttable
+  
+
+ import React, { useState } from "react";
+import { Box, IconButton, Stack, Button } from "@mui/material";
+import { DataGrid } from "@mui/x-data-grid";
+import VisibilityIcon from "@mui/icons-material/Visibility";
+import EditIcon from "@mui/icons-material/Edit";
+import DeleteIcon from "@mui/icons-material/Delete";
+
+import ClientDialog from "./ClientDialog";
+import axios from "axios";
+
+export default function ClientTable({ rows, setRows }) {
+    const [dialogOpen, setDialogOpen] = useState(false);
+    const [dialogData, setDialogData] = useState(null);
+    const [dialogMode, setDialogMode] = useState("view");
+
+    const handleOpenDialog = (row, mode) => {
+        setDialogData(row);
+        setDialogMode(mode);
+        setDialogOpen(true);
+    };
+
+    // UPDATE
+    const handleSaveEdit = async (formData, id) => {
+        const res = await axios.put(
+            `http://localhost:5000/api/clients/${id}`,
+            formData,
+            { headers: { "Content-Type": "multipart/form-data" } }
+        );
+        setRows(prev => prev.map(r => (r._id === id ? res.data : r)));
+    };
+
+    // DELETE
+    const handleDelete = async (id) => {
+        await axios.delete(`http://localhost:5000/api/clients/${id}`);
+        setRows(prev => prev.filter(r => r._id !== id));
+    };
+
+    const columns = [
+        { field: "name", headerName: "Name", flex: 1 },
+        { field: "date", headerName: "Date", flex: 1 },
+        { field: "todo", headerName: "Todo", flex: 1 },
+        {
+            field: "file",
+            headerName: "File",
+            flex: 1,
+            renderCell: (params) =>
+                params.value ? (
+                    <Button
+                        size="small"
+                        onClick={() =>
+                            window.open(`http://localhost:5000/uploads/${params.value}`)
+                        }
+                    >
+                        View
+                    </Button>
+                ) : null
+        },
+        {
+            field: "actions",
+            headerName: "Actions",
+            flex: 1,
+            renderCell: (params) => (
+                <Stack direction="row" spacing={1}>
+                    <IconButton
+                        color="primary"
+                        onClick={() => handleOpenDialog(params.row, "view")}
+                    >
+                        <VisibilityIcon />
+                    </IconButton>
+                    <IconButton
+                        color="success"
+                        onClick={() => handleOpenDialog(params.row, "edit")}
+                    >
+                        <EditIcon />
+                    </IconButton>
+                    <IconButton
+                        color="error"
+                        onClick={() => handleDelete(params.row._id)}
+                    >
+                        <DeleteIcon />
+                    </IconButton>
+                </Stack>
+            )
+        }
+    ];
+
+    return (
+        <Box sx={{ height: 400 }}>
+            <DataGrid
+                rows={rows}
+                columns={columns}
+                getRowId={(row) => row._id}
+                pageSizeOptions={[5]}
+            />
+            <ClientDialog
+                open={dialogOpen}
+                onClose={() => setDialogOpen(false)}
+                data={dialogData}
+                mode={dialogMode}
+                onSave={handleSaveEdit}
+            />
+        </Box>
+    );
+}
+

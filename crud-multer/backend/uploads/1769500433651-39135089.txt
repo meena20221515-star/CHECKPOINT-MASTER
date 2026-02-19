@@ -1,0 +1,1941 @@
+db.js
+   const mongoose = require("mongoose");
+
+const connectDB = async () => {
+  try {
+    await mongoose.connect("mongodb://127.0.0.1:27017/checkpointDB");
+    console.log("MongoDB Connected");
+  } catch (err) {
+    console.error(err.message);
+    process.exit(1);
+  }
+};
+
+module.exports = connectDB;
+----------------------------------
+checkpoint.js
+
+      // In your backend route (checkpoints.js)
+router.put('/:id', upload.array('files', 10), async (req, res) => {
+  try {
+    console.log('📥 Update request received');
+    console.log('Content-Type:', req.headers['content-type']);
+    console.log('Body:', req.body);
+    console.log('Files:', req.files);
+    
+    const { id } = req.params;
+    
+    // Parse data based on content type
+    let updateData = {};
+    
+    if (req.headers['content-type']?.includes('multipart/form-data')) {
+      // Handle FormData
+      updateData.checkpoint = req.body.checkpoint;
+      updateData.date = req.body.date;
+      
+      // Parse todos from FormData
+      if (req.body.todos) {
+        try {
+          updateData.todos = JSON.parse(req.body.todos);
+        } catch (e) {
+          updateData.todos = [req.body.todos];
+        }
+      }
+      
+      // Handle files from FormData
+      if (req.files && req.files.length > 0) {
+        updateData.files = req.files.map(file => ({
+          filename: file.filename,
+          originalname: file.originalname,
+          path: file.path,
+          size: file.size,
+          mimetype: file.mimetype,
+          url: `/uploads/${file.filename}`
+        }));
+      }
+    } else {
+      // Handle JSON data
+      updateData = {
+        checkpoint: req.body.checkpoint,
+        date: req.body.date,
+        todos: req.body.todos,
+        files: req.body.files
+      };
+    }
+    
+    console.log('📝 Update data to save:', updateData);
+    
+    // Update in database
+    const updated = await Checkpoint.findByIdAndUpdate(
+      id,
+      updateData,
+      { new: true, runValidators: true }
+    );
+    
+    if (!updated) {
+      return res.status(404).json({ error: 'Checkpoint not found' });
+    }
+    
+    console.log('✅ Update successful');
+    res.json(updated);
+    
+  } catch (err) {
+    console.error('❌ Update error:', err);
+    res.status(500).json({ 
+      error: 'Server error', 
+      message: err.message 
+    });
+  }
+});
+------------------------------------------------
+controller
+
+  const Checkpoint = require("../models/Checkpoint");
+const fs = require("fs");
+const path = require("path");
+
+// CREATE
+exports.createCheckpoint = async (req, res) => {
+  try {
+    const { checkpoint, date, todos } = req.body;
+
+    if (!checkpoint || !date || !todos) {
+      return res.status(400).json({ error: "All fields required" });
+    }
+
+    const files = req.files ? req.files.map(f => f.filename) : [];
+
+    const newCheckpoint = new Checkpoint({
+      checkpoint,
+      date,
+      todos: JSON.parse(todos),
+      files
+    });
+
+    await newCheckpoint.save();
+    res.status(201).json(newCheckpoint);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// GET SINGLE CHECKPOINT
+exports.getCheckpointById = async (req, res) => {
+  try {
+    const checkpoint = await Checkpoint.findById(req.params.id);
+    if (!checkpoint) {
+      return res.status(404).json({ error: "Checkpoint not found" });
+    }
+    res.json(checkpoint);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// GET ALL
+exports.getCheckpoints = async (req, res) => {
+  const data = await Checkpoint.find().sort({ createdAt: -1 });
+  res.json(data);
+};
+
+// UPDATE
+exports.updateCheckpoint = async (req, res) => {
+  try {
+    const { checkpoint, date, todos, existingFiles } = req.body;
+    
+    // Get current checkpoint data
+    const currentCheckpoint = await Checkpoint.findById(req.params.id);
+    
+    let filesToKeep = [];
+    if (existingFiles) {
+      filesToKeep = JSON.parse(existingFiles);
+    }
+
+    // Get newly uploaded files
+    const newFiles = req.files ? req.files.map(f => f.filename) : [];
+    
+    // Combine old and new files
+    const allFiles = [...filesToKeep, ...newFiles];
+
+    const updated = await Checkpoint.findByIdAndUpdate(
+      req.params.id,
+      {
+        checkpoint,
+        date,
+        todos: JSON.parse(todos),
+        files: allFiles
+      },
+      { new: true }
+    );
+
+    res.json(updated);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// DELETE FILE
+exports.deleteFile = async (req, res) => {
+  try {
+    const { checkpointId, filename } = req.params;
+    
+    const checkpoint = await Checkpoint.findById(checkpointId);
+    if (!checkpoint) {
+      return res.status(404).json({ error: "Checkpoint not found" });
+    }
+
+    // Remove file from array
+    checkpoint.files = checkpoint.files.filter(file => file !== filename);
+    await checkpoint.save();
+
+    // Delete file from uploads folder
+    const filePath = path.join(__dirname, "../uploads", filename);
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+    }
+
+    res.json({ message: "File deleted successfully", checkpoint });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// DELETE
+exports.deleteCheckpoint = async (req, res) => {
+  try {
+    const checkpoint = await Checkpoint.findById(req.params.id);
+    
+    // Delete all files from uploads folder
+    if (checkpoint.files && checkpoint.files.length > 0) {
+      checkpoint.files.forEach(filename => {
+        const filePath = path.join(__dirname, "../uploads", filename);
+        if (fs.existsSync(filePath)) {
+          fs.unlinkSync(filePath);
+        }
+      });
+    }
+
+    await Checkpoint.findByIdAndDelete(req.params.id);
+    res.json({ message: "Checkpoint deleted successfully" });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+--------------------------------------------------------
+routes
+           const express = require("express");
+const multer = require("multer");
+const {
+  createCheckpoint,
+  getCheckpoints,
+  getCheckpointById,
+  updateCheckpoint,
+  deleteCheckpoint,
+  deleteFile
+} = require("../controllers/checkpointController");
+
+const router = express.Router();
+
+const storage = multer.diskStorage({
+  destination: "uploads/",
+  filename: (req, file, cb) =>
+    cb(null, Date.now() + "-" + file.originalname)
+});
+
+const upload = multer({ storage });
+
+router.post("/", upload.array("files", 10), createCheckpoint);
+router.get("/", getCheckpoints);
+router.get("/:id", getCheckpointById);
+router.put("/:id", upload.array("files", 10), updateCheckpoint);
+router.delete("/:id", deleteCheckpoint);
+router.delete("/files/:checkpointId/:filename", deleteFile);
+
+module.exports = router;
+--------------------------------------
+// server.js - CORRECTED VERSION
+const express = require("express");
+const mongoose = require("mongoose");
+const cors = require("cors");
+const path = require("path");
+
+const checkpointRoutes = require("./routes/checkpointRoutes");
+
+const app = express();
+
+
+// MIDDLEWARE
+
+app.use(cors());
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+
+// STATIC FILES (UPLOADS)
+
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+
+
+// API ROUTES
+
+app.use("/api/checkpoints", checkpointRoutes);
+
+
+// DATABASE CONNECTION
+
+mongoose
+  .connect("mongodb://127.0.0.1:27017/checkpoint_master", {
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+  })
+  .then(() => console.log("✅ MongoDB Connected"))
+  .catch((err) => console.error("❌ MongoDB Error:", err));
+
+
+// DEFAULT ROUTE (TEST)
+
+app.get("/", (req, res) => {
+  res.json({ 
+    message: "🚀 Checkpoint Master API is running...",
+    endpoints: {
+      checkpoints: "/api/checkpoints",
+      uploads: "/uploads"
+    }
+  });
+});
+
+// Error handling middleware
+app.use((err, req, res, next) => {
+  console.error(err.stack);
+  res.status(500).json({ error: 'Something broke!' });
+});
+
+// 404 handler
+app.use((req, res) => {
+  res.status(404).json({ error: 'Route not found' });
+});
+
+
+// SERVER START
+
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => {
+  console.log(`🚀 Server running on http://localhost:${PORT}`);
+  console.log(`📁 Uploads folder: ${path.join(__dirname, 'uploads')}`);
+});
+------------------------------------------------------------index.js
+ import React from 'react';
+import ReactDOM from 'react-dom/client';
+import './index.css';
+import App from './App';
+
+
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>
+);
+
+
+----------------------------------app.js
+// App.js - COMPLETE WORKING VERSION
+import React, { useState, useEffect } from 'react';
+import axios from 'axios';
+import CheckpointTable from './components/CheckpointTable';
+import { Container, Typography, Alert, Snackbar, Box, Button } from '@mui/material';
+import AddIcon from '@mui/icons-material/Add';
+
+function App() {
+  const [checkpoints, setCheckpoints] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState({ open: false, text: '', severity: 'success' });
+
+  const showMessage = (severity, text) => {
+    setMessage({ open: true, text, severity });
+  };
+
+  const handleCloseMessage = () => {
+    setMessage(prev => ({ ...prev, open: false }));
+  };
+
+  // Fetch all checkpoints
+  const fetchCheckpoints = async () => {
+    try {
+      setLoading(true);
+      const res = await axios.get('http://localhost:5000/api/checkpoints');
+      setCheckpoints(res.data);
+      console.log('✅ Fetched checkpoints:', res.data.length);
+    } catch (err) {
+      console.error('❌ Error fetching checkpoints:', err);
+      showMessage('error', 'Failed to load checkpoints');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchCheckpoints();
+  }, []);
+
+  // Handle delete checkpoint
+  const handleDelete = async (id) => {
+    try {
+      setLoading(true);
+      await axios.delete(`http://localhost:5000/api/checkpoints/${id}`);
+      setCheckpoints(prev => prev.filter(cp => cp._id !== id));
+      showMessage('success', 'Checkpoint deleted successfully');
+    } catch (err) {
+      console.error('❌ Error deleting checkpoint:', err);
+      showMessage('error', 'Failed to delete checkpoint');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Handle edit checkpoint - CORRECTED VERSION
+  const handleEdit = async (id, updateData) => {
+    try {
+      setLoading(true);
+      console.log('🔄 Editing checkpoint ID:', id);
+      console.log('Update data type:', typeof updateData);
+      console.log('Is FormData?', updateData instanceof FormData);
+      
+      let response;
+      
+      if (updateData instanceof FormData) {
+        // Handle FormData (with files)
+        console.log('📁 Sending FormData with files');
+        
+        // Log FormData contents for debugging
+        console.log('FormData entries:');
+        for (let [key, value] of updateData.entries()) {
+          console.log(`${key}:`, value instanceof File ? `${value.name} (${value.size} bytes)` : value);
+        }
+        
+        response = await axios.put(
+          `http://localhost:5000/api/checkpoints/${id}`,
+          updateData,
+          {
+            headers: {
+              'Content-Type': 'multipart/form-data'
+            }
+          }
+        );
+      } else {
+        // Handle JSON data (no files or simple updates)
+        console.log('📄 Sending JSON data:', updateData);
+        
+        // Ensure todos is an array
+        let todosArray = [];
+        if (updateData.todos) {
+          if (Array.isArray(updateData.todos)) {
+            todosArray = updateData.todos;
+          } else if (typeof updateData.todos === 'string') {
+            try {
+              todosArray = JSON.parse(updateData.todos);
+            } catch (e) {
+              todosArray = [updateData.todos];
+            }
+          }
+        }
+        
+        // Prepare clean data for backend
+        const cleanData = {
+          checkpoint: updateData.checkpoint || '',
+          date: updateData.date || new Date().toISOString().split('T')[0],
+          todos: todosArray,
+        };
+        
+        // Add files if they exist (clean file objects)
+        if (updateData.files && Array.isArray(updateData.files)) {
+          cleanData.files = updateData.files.map(file => ({
+            name: file.name || file.filename || 'Unnamed file',
+            type: file.type || 'application/octet-stream',
+            size: file.size || 0,
+            url: file.url || file.path || null,
+            _id: file._id || null
+          }));
+        }
+        
+        console.log('📤 Final data being sent:', cleanData);
+        
+        response = await axios.put(
+          `http://localhost:5000/api/checkpoints/${id}`,
+          cleanData,
+          { 
+            headers: { 
+              'Content-Type': 'application/json' 
+            } 
+          }
+        );
+      }
+      
+      console.log('✅ Update successful:', response.data);
+      
+      // Update state
+      setCheckpoints(prev => prev.map(cp => 
+        cp._id === id ? response.data : cp
+      ));
+      
+      showMessage('success', 'Checkpoint updated successfully');
+      return response.data;
+      
+    } catch (err) {
+      console.error('❌ Update error details:', {
+        message: err.message,
+        response: err.response?.data,
+        status: err.response?.status,
+        config: err.config
+      });
+      
+      let errorMsg = 'Failed to update checkpoint';
+      if (err.response?.data) {
+        if (err.response.data.error) errorMsg = err.response.data.error;
+        if (err.response.data.message) errorMsg = err.response.data.message;
+        if (err.response.data.errors) {
+          errorMsg = Object.values(err.response.data.errors).join(', ');
+        }
+      } else if (err.message) {
+        errorMsg = err.message;
+      }
+      
+      showMessage('error', `Update failed: ${errorMsg}`);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Handle view checkpoint
+  const handleView = (id) => {
+    console.log('👁️ View checkpoint:', id);
+    const checkpoint = checkpoints.find(cp => cp._id === id);
+    if (checkpoint) {
+      alert(`
+Checkpoint Details:
+Name: ${checkpoint.checkpoint}
+Date: ${new Date(checkpoint.date).toLocaleDateString()}
+Todos: ${checkpoint.todos?.join(', ') || 'None'}
+Files: ${checkpoint.files?.length || 0}
+      `);
+    }
+  };
+
+  // Create test checkpoint
+  const createTestCheckpoint = async () => {
+    try {
+      setLoading(true);
+      const testData = {
+        checkpoint: 'Test Checkpoint ' + new Date().toLocaleTimeString(),
+        date: new Date().toISOString().split('T')[0],
+        todos: ['Test todo 1', 'Test todo 2', 'Test todo 3']
+      };
+      
+      console.log('Creating test checkpoint:', testData);
+      
+      const res = await axios.post(
+        'http://localhost:5000/api/checkpoints',
+        testData,
+        { headers: { 'Content-Type': 'application/json' } }
+      );
+      
+      setCheckpoints(prev => [res.data, ...prev]);
+      showMessage('success', 'Test checkpoint created successfully');
+    } catch (err) {
+      console.error('❌ Error creating test checkpoint:', err);
+      showMessage('error', 'Failed to create test checkpoint');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Test the update function
+  const testUpdateFunction = async () => {
+    if (checkpoints.length === 0) {
+      showMessage('warning', 'No checkpoints to test. Create one first.');
+      return;
+    }
+    
+    const testId = checkpoints[0]._id;
+    const testData = {
+      checkpoint: 'UPDATED ' + new Date().toLocaleTimeString(),
+      date: new Date().toISOString().split('T')[0],
+      todos: ['Updated todo 1', 'Updated todo 2'],
+      files: []
+    };
+    
+    console.log('🧪 Testing update function with ID:', testId);
+    
+    try {
+      await handleEdit(testId, testData);
+      console.log('✅ Test update successful!');
+    } catch (error) {
+      console.error('❌ Test update failed:', error);
+    }
+  };
+
+  return (
+    <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+      <Typography variant="h4" gutterBottom sx={{ fontWeight: 'bold', color: 'primary.main' }}>
+        📋 Checkpoint Master
+      </Typography>
+      
+      <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Typography variant="subtitle1" color="text.secondary">
+          Total checkpoints: {checkpoints.length}
+        </Typography>
+        <Box sx={{ display: 'flex', gap: 2 }}>
+          <Button
+            variant="outlined"
+            color="secondary"
+            onClick={testUpdateFunction}
+            disabled={loading || checkpoints.length === 0}
+          >
+            Test Update
+          </Button>
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={createTestCheckpoint}
+            disabled={loading}
+          >
+            Create Test
+          </Button>
+        </Box>
+      </Box>
+      
+      {loading && checkpoints.length === 0 ? (
+        <Typography>Loading checkpoints...</Typography>
+      ) : (
+        <CheckpointTable
+          checkpoints={checkpoints}
+          onDelete={handleDelete}
+          onView={handleView}
+          onEdit={handleEdit}
+          loading={loading}
+        />
+      )}
+      
+      <Snackbar
+        open={message.open}
+        autoHideDuration={6000}
+        onClose={handleCloseMessage}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert 
+          onClose={handleCloseMessage} 
+          severity={message.severity}
+          sx={{ width: '100%' }}
+        >
+          {message.text}
+        </Alert>
+      </Snackbar>
+    </Container>
+  );
+}
+
+// CRITICAL: This must be at the end
+export default App;
+-----------------------------------------form.js
+  
+  import React, { useState } from "react";
+import {
+  Stack,
+  TextField,
+  IconButton,
+  Button,
+  Paper,
+  Typography,
+  Box,
+  List,
+  ListItem,
+  ListItemText,
+  ListItemSecondaryAction,
+  Chip,
+  Grid,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions
+} from "@mui/material";
+import AddCircleIcon from "@mui/icons-material/AddCircle";
+import DeleteIcon from "@mui/icons-material/Delete";
+import UploadFileIcon from "@mui/icons-material/UploadFile";
+import AttachmentIcon from "@mui/icons-material/Attachment";
+import EditIcon from "@mui/icons-material/Edit";
+import axios from "axios";
+
+export default function CheckpointForm({ onSubmit }) {
+  const [checkpoint, setCheckpoint] = useState("");
+  const [date, setDate] = useState("");
+  const [todoInput, setTodoInput] = useState("");
+  const [todos, setTodos] = useState([]);
+  const [files, setFiles] = useState([]);
+  
+  // Edit popup state
+  const [editOpen, setEditOpen] = useState(false);
+  const [editIndex, setEditIndex] = useState(null);
+  const [editText, setEditText] = useState("");
+
+  const addTodo = () => {
+    if (todoInput.trim()) {
+      setTodos([...todos, todoInput.trim()]);
+      setTodoInput("");
+    }
+  };
+
+  const removeTodo = (index) => {
+    setTodos(todos.filter((_, i) => i !== index));
+  };
+
+  // EDIT FUNCTIONALITY
+  const openEditDialog = (index, todoText) => {
+    setEditIndex(index);
+    setEditText(todoText);
+    setEditOpen(true);
+  };
+
+  const handleEditSave = () => {
+    if (editText.trim() && editIndex !== null) {
+      const updatedTodos = [...todos];
+      updatedTodos[editIndex] = editText.trim();
+      setTodos(updatedTodos);
+      closeEditDialog();
+    }
+  };
+
+  const closeEditDialog = () => {
+    setEditOpen(false);
+    setEditIndex(null);
+    setEditText("");
+  };
+
+  const handleKeyPress = (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      addTodo();
+    }
+  };
+
+  const handleFileChange = (e) => {
+    setFiles([...files, ...Array.from(e.target.files)]);
+  };
+
+  const removeFile = (index) => {
+    setFiles(files.filter((_, i) => i !== index));
+  };
+
+  const clearForm = () => {
+    setCheckpoint("");
+    setDate("");
+    setTodoInput("");
+    setTodos([]);
+    setFiles([]);
+  };
+
+  const handleSubmit = async () => {
+    if (!checkpoint || !date || todos.length === 0) {
+      alert("Please fill in all required fields and add at least one todo");
+      return;
+    }
+
+    try {
+      const formData = new FormData();
+      formData.append("checkpoint", checkpoint);
+      formData.append("date", date);
+      formData.append("todos", JSON.stringify(todos));
+      files.forEach(file => formData.append("files", file));
+
+      const res = await axios.post(
+        "http://localhost:5000/api/checkpoints",
+        formData,
+        {
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
+        }
+      );
+
+      onSubmit(res.data);
+      clearForm();
+    } catch (err) {
+      console.error("Error saving checkpoint:", err);
+      alert("Failed to save checkpoint");
+    }
+  };
+
+  return (
+    <Box>
+      <Grid container spacing={3}>
+        {/* Checkpoint and Date Row */}
+        <Grid item xs={12}>
+          <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
+            <TextField
+              label="Checkpoint Name *"
+              value={checkpoint}
+              onChange={(e) => setCheckpoint(e.target.value)}
+              fullWidth
+              size="small"
+            />
+            <TextField
+              type="date"
+              label="Date *"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+              InputLabelProps={{ shrink: true }}
+              fullWidth
+              size="small"
+            />
+          </Stack>
+        </Grid>
+
+        {/* Todo Input Row */}
+        <Grid item xs={12}>
+          <Paper variant="outlined" sx={{ p: 2 }}>
+            <Typography variant="subtitle2" gutterBottom>
+              Add Todos *
+            </Typography>
+            <Stack direction="row" spacing={1}>
+              <TextField
+                placeholder="Enter todo item"
+                value={todoInput}
+                onChange={(e) => setTodoInput(e.target.value)}
+                onKeyPress={handleKeyPress}
+                fullWidth
+                size="small"
+              />
+              <IconButton
+                color="primary"
+                onClick={addTodo}
+                disabled={!todoInput.trim()}
+                title="Add Todo"
+              >
+                <AddCircleIcon />
+              </IconButton>
+            </Stack>
+
+            {/* Todo List */}
+            {todos.length > 0 && (
+              <Box sx={{ mt: 2 }}>
+                <Typography variant="caption" color="text.secondary">
+                  Added Todos ({todos.length})
+                </Typography>
+                <List dense>
+                  {todos.map((todo, index) => (
+                    <ListItem
+                      key={index}
+                      sx={{
+                        bgcolor: "action.hover",
+                        mb: 0.5,
+                        borderRadius: 1,
+                      }}
+                    >
+                      <ListItemText
+                        primary={`${index + 1}. ${todo}`}
+                        primaryTypographyProps={{ variant: "body2" }}
+                      />
+                      <ListItemSecondaryAction>
+                        <Stack direction="row" spacing={0.5}>
+                          <IconButton
+                            edge="end"
+                            size="small"
+                            onClick={() => openEditDialog(index, todo)}
+                            title="Edit Todo"
+                          >
+                            <EditIcon fontSize="small" />
+                          </IconButton>
+                          <IconButton
+                            edge="end"
+                            size="small"
+                            onClick={() => removeTodo(index)}
+                            title="Delete Todo"
+                          >
+                            <DeleteIcon fontSize="small" />
+                          </IconButton>
+                        </Stack>
+                      </ListItemSecondaryAction>
+                    </ListItem>
+                  ))}
+                </List>
+              </Box>
+            )}
+          </Paper>
+        </Grid>
+
+        {/* File Upload Section */}
+        <Grid item xs={12}>
+          <Paper variant="outlined" sx={{ p: 2 }}>
+            <Typography variant="subtitle2" gutterBottom>
+              Upload Files (Optional)
+            </Typography>
+            <Button
+              component="label"
+              variant="outlined"
+              startIcon={<UploadFileIcon />}
+              size="small"
+            >
+              Select Files
+              <input
+                type="file"
+                hidden
+                multiple
+                onChange={handleFileChange}
+              />
+            </Button>
+
+            {/* File List */}
+            {files.length > 0 && (
+              <Box sx={{ mt: 2 }}>
+                <Typography variant="caption" color="text.secondary">
+                  Selected Files ({files.length})
+                </Typography>
+                <Stack spacing={0.5} sx={{ mt: 1 }}>
+                  {files.map((file, index) => (
+                    <Chip
+                      key={index}
+                      icon={<AttachmentIcon />}
+                      label={file.name}
+                      onDelete={() => removeFile(index)}
+                      size="small"
+                      variant="outlined"
+                    />
+                  ))}
+                </Stack>
+              </Box>
+            )}
+          </Paper>
+        </Grid>
+
+        {/* Action Buttons */}
+        <Grid item xs={12}>
+          <Stack direction="row" spacing={2} justifyContent="flex-end">
+            <Button
+              variant="outlined"
+              color="error"
+              onClick={clearForm}
+              size="small"
+            >
+              Clear
+            </Button>
+            <Button
+              variant="contained"
+              onClick={handleSubmit}
+              disabled={!checkpoint || !date || todos.length === 0}
+              size="small"
+            >
+              Save Checkpoint
+            </Button>
+          </Stack>
+        </Grid>
+      </Grid>
+
+      {/* Edit Todo Dialog */}
+      <Dialog open={editOpen} onClose={closeEditDialog} maxWidth="sm" fullWidth>
+        <DialogTitle>Edit Todo Item</DialogTitle>
+        <DialogContent>
+          <TextField
+            autoFocus
+            margin="dense"
+            label="Todo Text"
+            type="text"
+            fullWidth
+            variant="outlined"
+            value={editText}
+            onChange={(e) => setEditText(e.target.value)}
+            onKeyPress={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                handleEditSave();
+              }
+            }}
+            size="small"
+            sx={{ mt: 2 }}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={closeEditDialog} color="inherit">
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleEditSave} 
+            variant="contained"
+            disabled={!editText.trim()}
+          >
+            Save Changes
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </Box>
+  );
+}
+-----------------------------------------------tableimport React, { useState, useMemo } from "react";
+import {
+  Box,
+  Paper,
+  Typography,
+  Chip,
+  Alert,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Divider,
+  List,
+  ListItem,
+  ListItemText,
+  Button,
+  IconButton,
+  TextField,
+  Tooltip,
+  Stack,
+} from "@mui/material";
+import {
+  DataGrid,
+  GridToolbarContainer,
+  GridToolbarFilterButton,
+  GridToolbarExport,
+  GridToolbarQuickFilter,
+  GridActionsCellItem,
+} from "@mui/x-data-grid";
+import {
+  Visibility as ViewIcon,
+  Edit as EditIcon,
+  Delete as DeleteIcon,
+  Task as TaskIcon,
+  Add as AddIcon,
+  Save as SaveIcon,
+  Cancel as CancelIcon,
+  Check as CheckIcon,
+  Clear as ClearIcon,
+  CloudUpload as UploadIcon,
+  InsertDriveFile as FileIcon,
+  Search as SearchIcon,
+  FolderOpen as FolderOpenIcon,
+} from "@mui/icons-material";
+
+export default function CheckpointTable({ checkpoints, onDelete, onView, onEdit }) {
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [selectedCheckpointId, setSelectedCheckpointId] = useState(null);
+  const [editCheckpoint, setEditCheckpoint] = useState("");
+  const [editDate, setEditDate] = useState("");
+  const [editTodos, setEditTodos] = useState([]);
+  const [editTodoInput, setEditTodoInput] = useState("");
+  const [editingTodoIndex, setEditingTodoIndex] = useState(-1);
+  const [editTempValue, setEditTempValue] = useState("");
+  const [message, setMessage] = useState("");
+  const [searchText, setSearchText] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [viewFileDialogOpen, setViewFileDialogOpen] = useState(false);
+  const [selectedFile, setSelectedFile] = useState(null);
+  
+  const [editFiles, setEditFiles] = useState([]);
+  const [newFile, setNewFile] = useState(null);
+  const [fileName, setFileName] = useState("");
+
+  const formatDate = (dateString) => {
+    if (!dateString) return "N/A";
+    try {
+      return new Date(dateString).toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric"
+      });
+    } catch (error) {
+      return "Invalid Date";
+    }
+  };
+
+  const formatDateForInput = (dateString) => {
+    if (!dateString) return "";
+    try {
+      const date = new Date(dateString);
+      return date.toISOString().split('T')[0];
+    } catch (error) {
+      return "";
+    }
+  };
+
+  // Get file name correctly
+  const getFileName = (file) => {
+    if (!file) return "No file";
+    // Handle different file object structures
+    if (typeof file === 'string') {
+      return file; // If file is just a string (filename)
+    }
+    if (typeof file === 'object') {
+      return file.name || file.filename || file.originalname || "Uploaded file";
+    }
+    return "Uploaded file";
+  };
+
+  // Get file type correctly
+  const getFileType = (file) => {
+    if (!file) return "Unknown";
+    if (typeof file === 'string') {
+      // Try to determine type from extension
+      const ext = file.split('.').pop().toLowerCase();
+      const types = {
+        'pdf': 'application/pdf',
+        'txt': 'text/plain',
+        'doc': 'application/msword',
+        'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'jpg': 'image/jpeg',
+        'jpeg': 'image/jpeg',
+        'png': 'image/png',
+        'gif': 'image/gif',
+        'xls': 'application/vnd.ms-excel',
+        'xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      };
+      return types[ext] || 'application/octet-stream';
+    }
+    if (typeof file === 'object') {
+      return file.type || file.mimetype || "application/octet-stream";
+    }
+    return "application/octet-stream";
+  };
+
+  // Get file size correctly
+  const getFileSize = (file) => {
+    if (!file) return 0;
+    if (typeof file === 'object') {
+      return file.size || 1024;
+    }
+    return 1024; // Default size for string files
+  };
+
+  const selectedCheckpoint = useMemo(() => {
+    if (!selectedCheckpointId) return null;
+    return checkpoints.find(cp => cp._id === selectedCheckpointId);
+  }, [selectedCheckpointId, checkpoints]);
+
+  // Open edit dialog
+  const handleOpenEditDialog = (checkpointId) => {
+    const checkpoint = checkpoints.find(cp => cp._id === checkpointId);
+    
+    if (!checkpoint) {
+      setMessage("Error: Checkpoint not found!");
+      return;
+    }
+
+    setSelectedCheckpointId(checkpointId);
+    setEditCheckpoint(checkpoint.checkpoint || "");
+    setEditDate(formatDateForInput(checkpoint.date) || "");
+    setEditTodos(checkpoint.todos || []);
+    
+    // Process files
+    let files = [];
+    if (checkpoint.files) {
+      if (Array.isArray(checkpoint.files)) {
+        files = checkpoint.files.map(file => {
+          // Handle string files (just filenames)
+          if (typeof file === 'string') {
+            return {
+              name: file,
+              type: getFileType(file),
+              size: 1024
+            };
+          }
+          // Handle object files
+          if (file && typeof file === 'object') {
+            return {
+              name: getFileName(file),
+              type: getFileType(file),
+              size: getFileSize(file),
+              ...file
+            };
+          }
+          return file;
+        });
+      } else if (typeof checkpoint.files === 'string') {
+        // Handle single string file
+        files = [{
+          name: checkpoint.files,
+          type: getFileType(checkpoint.files),
+          size: 1024
+        }];
+      }
+    }
+    
+    setEditFiles(files);
+    setEditTodoInput("");
+    setEditingTodoIndex(-1);
+    setEditTempValue("");
+    setFileName("");
+    setNewFile(null);
+    setMessage("");
+    
+    setEditDialogOpen(true);
+  };
+
+  // View file details
+  const handleViewFile = (file) => {
+    setSelectedFile({
+      name: getFileName(file),
+      type: getFileType(file),
+      size: getFileSize(file),
+      ...file
+    });
+    setViewFileDialogOpen(true);
+  };
+
+  // File upload handler
+  const handleFileUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setNewFile(file);
+      setFileName(file.name);
+    }
+  };
+
+  // Add new file
+  const handleAddFile = () => {
+    if (!newFile && !fileName.trim()) {
+      setMessage("Please select a file or enter a file name!");
+      return;
+    }
+
+    const newFileObj = {
+      name: fileName.trim() || newFile.name,
+      type: newFile ? newFile.type : "application/octet-stream",
+      size: newFile ? newFile.size : 1024,
+    };
+
+    setEditFiles(prev => [...prev, newFileObj]);
+    setNewFile(null);
+    setFileName("");
+    setMessage(`Added file: ${newFileObj.name}`);
+  };
+
+  // Edit file name
+  const handleEditFileName = (index, newName) => {
+    if (!newName.trim()) {
+      setMessage("File name cannot be empty!");
+      return;
+    }
+
+    const updatedFiles = [...editFiles];
+    updatedFiles[index] = { ...updatedFiles[index], name: newName.trim() };
+    setEditFiles(updatedFiles);
+    setMessage(`Renamed file to: ${newName}`);
+  };
+
+  // Delete file
+  const handleDeleteFile = (index) => {
+    const fileName = getFileName(editFiles[index]);
+    if (window.confirm(`Delete file "${fileName}"?`)) {
+      setEditFiles(prev => prev.filter((_, i) => i !== index));
+      setMessage(`Deleted file: ${fileName}`);
+    }
+  };
+
+  // Todo functions
+  const handleAddTodo = () => {
+    if (!editTodoInput.trim()) {
+      setMessage("Please enter todo text!");
+      return;
+    }
+    
+    setEditTodos(prev => [...prev, editTodoInput.trim()]);
+    setEditTodoInput("");
+    setMessage(`Added todo: "${editTodoInput.trim()}"`);
+  };
+
+  const startTodoEdit = (index) => {
+    setEditingTodoIndex(index);
+    setEditTempValue(editTodos[index]);
+  };
+
+  const saveTodoEdit = () => {
+    if (!editTempValue.trim()) {
+      setMessage("Todo cannot be empty!");
+      return;
+    }
+    
+    const updatedTodos = [...editTodos];
+    updatedTodos[editingTodoIndex] = editTempValue.trim();
+    setEditTodos(updatedTodos);
+    setEditingTodoIndex(-1);
+    setEditTempValue("");
+    setMessage(`Todo updated`);
+  };
+
+  const cancelTodoEdit = () => {
+    setEditingTodoIndex(-1);
+    setEditTempValue("");
+  };
+
+  const deleteTodo = (index) => {
+    if (window.confirm(`Delete todo "${editTodos[index]}"?`)) {
+      setEditTodos(prev => prev.filter((_, i) => i !== index));
+      setMessage(`Deleted todo`);
+    }
+  };
+
+  // Save checkpoint
+  const handleSaveCheckpoint = async () => {
+    if (!editCheckpoint.trim()) {
+      setMessage("Checkpoint name required!");
+      return;
+    }
+    
+    if (editTodos.length === 0) {
+      setMessage("At least one todo required!");
+      return;
+    }
+
+    if (!editDate) {
+      setMessage("Date required!");
+      return;
+    }
+
+    if (!selectedCheckpointId) {
+      setMessage("Error: No checkpoint selected!");
+      return;
+    }
+
+    try {
+      setLoading(true);
+      
+      // Prepare files for saving - keep only essential data
+      const filesToSave = editFiles.map(file => {
+        // If file has a File object (from new upload), we can't send it directly
+        // In a real app, you'd upload the file separately first
+        const { name, type, size } = file;
+        return { name, type, size };
+      });
+
+      const updateData = {
+        checkpoint: editCheckpoint.trim(),
+        date: editDate,
+        todos: editTodos,
+        files: filesToSave
+      };
+
+      await onEdit(selectedCheckpointId, updateData);
+      
+      setEditDialogOpen(false);
+      setMessage("");
+      
+    } catch (error) {
+      console.error("Error saving checkpoint:", error);
+      setMessage(`Error: ${error.message || "Failed to save checkpoint"}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCloseDialog = () => {
+    setEditDialogOpen(false);
+    setMessage("");
+    setSelectedCheckpointId(null);
+    setLoading(false);
+  };
+
+  // Filter rows based on search text
+  const filteredRows = useMemo(() => {
+    if (!Array.isArray(checkpoints)) return [];
+    
+    let rows = checkpoints.map((cp, index) => ({
+      id: cp._id || `id-${index}`,
+      serialNo: index + 1,
+      checkpoint: cp.checkpoint || "Unnamed",
+      date: cp.date ? new Date(cp.date) : new Date(),
+      formattedDate: formatDate(cp.date),
+      todos: Array.isArray(cp.todos) ? cp.todos : [],
+      files: Array.isArray(cp.files) ? cp.files : [],
+    }));
+
+    if (searchText.trim()) {
+      const searchLower = searchText.toLowerCase();
+      rows = rows.filter(row =>
+        row.checkpoint.toLowerCase().includes(searchLower) ||
+        row.todos.some(todo => todo.toLowerCase().includes(searchLower)) ||
+        row.formattedDate.toLowerCase().includes(searchLower)
+      );
+    }
+
+    return rows;
+  }, [checkpoints, searchText]);
+
+  // Define columns
+  const columns = [
+    {
+      field: 'serialNo',
+      headerName: 'S.NO',
+      width: 80,
+      renderCell: (params) => (
+        <Chip 
+          label={params.value} 
+          size="small" 
+          color="primary" 
+          variant="outlined"
+        />
+      ),
+    },
+    {
+      field: 'checkpoint',
+      headerName: 'Checkpoint',
+      flex: 1,
+      minWidth: 200,
+      renderCell: (params) => (
+        <Typography variant="body2" fontWeight="medium">
+          {params.value}
+        </Typography>
+      ),
+    },
+    {
+      field: 'formattedDate',
+      headerName: 'Date',
+      width: 120,
+    },
+    {
+      field: 'todos',
+      headerName: 'Todos',
+      flex: 1,
+      minWidth: 200,
+      renderCell: (params) => (
+        <Stack spacing={0.5}>
+          {params.row.todos.slice(0, 2).map((todo, i) => (
+            <Box key={i} sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+              <TaskIcon fontSize="small" color="action" />
+              <Typography variant="body2" noWrap sx={{ maxWidth: '200px' }}>
+                {todo}
+              </Typography>
+            </Box>
+          ))}
+          {params.row.todos.length > 2 && (
+            <Typography variant="caption" color="text.secondary">
+              +{params.row.todos.length - 2} more
+            </Typography>
+          )}
+        </Stack>
+      ),
+    },
+    {
+      field: 'actions',
+      headerName: 'Actions',
+      type: 'actions',
+      width: 180,
+      getActions: (params) => [
+        <GridActionsCellItem
+          key="view"
+          icon={<Tooltip title="View Details"><ViewIcon /></Tooltip>}
+          label="View"
+          onClick={() => onView(params.id)}
+        />,
+        <GridActionsCellItem
+          key="edit"
+          icon={<Tooltip title="Edit"><EditIcon /></Tooltip>}
+          label="Edit"
+          onClick={() => handleOpenEditDialog(params.id)}
+        />,
+        <GridActionsCellItem
+          key="delete"
+          icon={<Tooltip title="Delete"><DeleteIcon /></Tooltip>}
+          label="Delete"
+          onClick={() => {
+            if (window.confirm('Delete this checkpoint?')) {
+              onDelete(params.id);
+            }
+          }}
+          sx={{ color: 'error.main' }}
+        />,
+      ],
+    },
+  ];
+
+  // Custom toolbar with Search Bar
+  function CustomToolbar() {
+    return (
+      <GridToolbarContainer sx={{ p: 2, borderBottom: 1, borderColor: 'divider' }}>
+        <Box sx={{ flexGrow: 1, display: 'flex', alignItems: 'center', gap: 2 }}>
+          <Typography variant="subtitle1" fontWeight="bold" color="primary">
+            Checkpoints ({filteredRows.length})
+          </Typography>
+          <Box sx={{ flexGrow: 1 }}>
+            <TextField
+              fullWidth
+              size="small"
+              placeholder="Search checkpoints, todos, dates..."
+              value={searchText}
+              onChange={(e) => setSearchText(e.target.value)}
+              InputProps={{
+                startAdornment: (
+                  <SearchIcon color="action" sx={{ mr: 1 }} />
+                ),
+              }}
+              sx={{ 
+                maxWidth: 400,
+                '& .MuiInputBase-root': { height: 40 }
+              }}
+            />
+          </Box>
+        </Box>
+        <Box sx={{ display: 'flex', gap: 1 }}>
+          <GridToolbarFilterButton />
+          <GridToolbarExport />
+        </Box>
+      </GridToolbarContainer>
+    );
+  }
+
+  if (!checkpoints || checkpoints.length === 0) {
+    return (
+      <Alert severity="info" sx={{ mt: 2 }}>
+        No checkpoints found.
+      </Alert>
+    );
+  }
+
+  return (
+    <>
+      {/* Main DataGrid Table */}
+      <Paper elevation={0} variant="outlined" sx={{ height: 500, width: '100%' }}>
+        <DataGrid
+          rows={filteredRows}
+          columns={columns}
+          slots={{ toolbar: CustomToolbar }}
+          initialState={{
+            pagination: { paginationModel: { page: 0, pageSize: 10 } },
+            sorting: { sortModel: [{ field: 'date', sort: 'desc' }] },
+          }}
+          pageSizeOptions={[5, 10, 25]}
+          sx={{
+            border: 'none',
+            '& .MuiDataGrid-columnHeaders': {
+              backgroundColor: 'primary.50',
+              fontWeight: 'bold',
+            },
+            '& .MuiDataGrid-cell': {
+              py: 1,
+            },
+            '& .MuiDataGrid-row:hover': {
+              backgroundColor: 'action.hover',
+            },
+          }}
+        />
+      </Paper>
+
+      {/* Edit Checkpoint Dialog */}
+      <Dialog 
+        open={editDialogOpen} 
+        onClose={!loading ? handleCloseDialog : undefined}
+        maxWidth="md" 
+        fullWidth
+        PaperProps={{ sx: { maxHeight: '90vh' } }}
+      >
+        <DialogTitle sx={{ pb: 1 }}>
+          <Typography variant="h6" component="div">
+            Edit Checkpoint
+          </Typography>
+          {selectedCheckpoint && (
+            <Typography variant="caption" color="text.secondary">
+              {selectedCheckpoint.checkpoint}
+            </Typography>
+          )}
+        </DialogTitle>
+
+        <DialogContent dividers sx={{ p: 3 }}>
+          {message && (
+            <Alert 
+              severity={message.includes('Error') ? 'error' : 'info'} 
+              sx={{ mb: 3 }} 
+              onClose={() => setMessage("")}
+            >
+              {message}
+            </Alert>
+          )}
+
+          {!selectedCheckpoint ? (
+            <Alert severity="error">
+              Failed to load checkpoint data.
+            </Alert>
+          ) : (
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+              {/* Section 1: Basic Information */}
+              <Box>
+                <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
+                  Basic Information
+                </Typography>
+                <Divider sx={{ mb: 2 }} />
+                <Stack spacing={2}>
+                  <TextField
+                    fullWidth
+                    label="Checkpoint Name *"
+                    size="small"
+                    value={editCheckpoint}
+                    onChange={(e) => setEditCheckpoint(e.target.value)}
+                    error={!editCheckpoint.trim()}
+                    helperText={!editCheckpoint.trim() ? "Required" : ""}
+                    disabled={loading}
+                  />
+                  <TextField
+                    fullWidth
+                    label="Date *"
+                    size="small"
+                    type="date"
+                    value={editDate}
+                    onChange={(e) => setEditDate(e.target.value)}
+                    InputLabelProps={{ shrink: true }}
+                    error={!editDate}
+                    helperText={!editDate ? "Required" : ""}
+                    disabled={loading}
+                  />
+                </Stack>
+              </Box>
+
+              {/* Section 2: Todo Management */}
+              <Box>
+                <Box display="flex" alignItems="center" justifyContent="space-between" mb={1}>
+                  <Typography variant="subtitle1" fontWeight="bold">
+                    Todo Management
+                  </Typography>
+                  <Chip label={`${editTodos.length} items`} size="small" color="primary" />
+                </Box>
+                <Divider sx={{ mb: 2 }} />
+                
+                {/* Add Todo Input */}
+                <Box display="flex" gap={2} alignItems="center" mb={2}>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    placeholder="Enter new todo..."
+                    value={editTodoInput}
+                    onChange={(e) => setEditTodoInput(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && handleAddTodo()}
+                    disabled={loading}
+                  />
+                  <Button
+                    variant="contained"
+                    color="primary"
+                    onClick={handleAddTodo}
+                    disabled={!editTodoInput.trim() || loading}
+                    startIcon={<AddIcon />}
+                    size="small"
+                  >
+                    Add
+                  </Button>
+                </Box>
+
+                {/* Todo List */}
+                {editTodos.length === 0 ? (
+                  <Alert severity="warning" sx={{ mb: 2 }}>
+                    Add at least one todo
+                  </Alert>
+                ) : (
+                  <List dense sx={{ maxHeight: 200, overflow: 'auto', border: '1px solid #e0e0e0', borderRadius: 1, p: 1 }}>
+                    {editTodos.map((todo, index) => (
+                      <ListItem 
+                        key={index}
+                        sx={{ 
+                          bgcolor: index === editingTodoIndex ? 'action.hover' : 'transparent',
+                          borderRadius: 1,
+                          mb: 0.5
+                        }}
+                      >
+                        <Box sx={{ display: 'flex', alignItems: 'center', width: '100%' }}>
+                          <TaskIcon fontSize="small" sx={{ mr: 2, color: 'action.active' }} />
+                          
+                          {index === editingTodoIndex ? (
+                            <Box sx={{ display: 'flex', alignItems: 'center', flex: 1, gap: 1 }}>
+                              <TextField
+                                fullWidth
+                                size="small"
+                                value={editTempValue}
+                                onChange={(e) => setEditTempValue(e.target.value)}
+                                autoFocus
+                                onKeyPress={(e) => e.key === 'Enter' && saveTodoEdit()}
+                                disabled={loading}
+                              />
+                              <IconButton 
+                                size="small" 
+                                onClick={saveTodoEdit} 
+                                color="success"
+                                disabled={loading}
+                              >
+                                <CheckIcon />
+                              </IconButton>
+                              <IconButton 
+                                size="small" 
+                                onClick={cancelTodoEdit} 
+                                color="error"
+                                disabled={loading}
+                              >
+                                <ClearIcon />
+                              </IconButton>
+                            </Box>
+                          ) : (
+                            <>
+                              <ListItemText 
+                                primary={todo}
+                                sx={{ flex: 1 }}
+                              />
+                              <Box>
+                                <IconButton 
+                                  size="small" 
+                                  onClick={() => startTodoEdit(index)} 
+                                  color="primary"
+                                  sx={{ mr: 1 }}
+                                  disabled={loading}
+                                >
+                                  <EditIcon />
+                                </IconButton>
+                                <IconButton 
+                                  size="small" 
+                                  onClick={() => deleteTodo(index)} 
+                                  color="error"
+                                  disabled={loading}
+                                >
+                                  <DeleteIcon />
+                                </IconButton>
+                              </Box>
+                            </>
+                          )}
+                        </Box>
+                      </ListItem>
+                    ))}
+                  </List>
+                )}
+              </Box>
+
+              {/* Section 3: File Management */}
+              <Box>
+                <Box display="flex" alignItems="center" justifyContent="space-between" mb={1}>
+                  <Typography variant="subtitle1" fontWeight="bold">
+                    File Management
+                  </Typography>
+                  <Chip label={`${editFiles.length} files`} size="small" color="secondary" />
+                </Box>
+                <Divider sx={{ mb: 2 }} />
+
+                {/* Add New File Section */}
+                <Box mb={3} p={2} bgcolor="grey.50" borderRadius={1}>
+                  <Typography variant="subtitle2" gutterBottom>
+                    Add New File
+                  </Typography>
+                  <Stack spacing={2}>
+                    <Box display="flex" alignItems="center" gap={2}>
+                      <Button
+                        variant="outlined"
+                        component="label"
+                        startIcon={<UploadIcon />}
+                        size="small"
+                        disabled={loading}
+                      >
+                        Choose File
+                        <input
+                          type="file"
+                          hidden
+                          onChange={handleFileUpload}
+                          disabled={loading}
+                        />
+                      </Button>
+                      {newFile && (
+                        <Typography variant="caption" color="primary">
+                          Selected: {newFile.name}
+                        </Typography>
+                      )}
+                    </Box>
+                    
+                    <TextField
+                      fullWidth
+                      size="small"
+                      label="File Name"
+                      value={fileName}
+                      onChange={(e) => setFileName(e.target.value)}
+                      placeholder="Enter file name..."
+                      disabled={loading}
+                    />
+                    
+                    <Button
+                      variant="contained"
+                      color="primary"
+                      onClick={handleAddFile}
+                      disabled={(!newFile && !fileName.trim()) || loading}
+                      startIcon={<AddIcon />}
+                      size="small"
+                    >
+                      Add File
+                    </Button>
+                  </Stack>
+                </Box>
+
+                {/* Attached Files List */}
+                {editFiles.length === 0 ? (
+                  <Alert severity="info">
+                    No files attached
+                  </Alert>
+                ) : (
+                  <Box>
+                    <Typography variant="subtitle2" gutterBottom>
+                      Attached Files ({editFiles.length})
+                    </Typography>
+                    <List dense sx={{ maxHeight: 200, overflow: 'auto', border: '1px solid #e0e0e0', borderRadius: 1, p: 1 }}>
+                      {editFiles.map((file, index) => {
+                        const fileName = getFileName(file);
+                        const fileType = getFileType(file);
+                        const fileSize = getFileSize(file);
+                        
+                        return (
+                          <ListItem
+                            key={index}
+                            sx={{
+                              bgcolor: 'transparent',
+                              borderRadius: 1,
+                              mb: 0.5
+                            }}
+                          >
+                            <Box sx={{ display: 'flex', alignItems: 'center', width: '100%' }}>
+                              <FileIcon fontSize="small" sx={{ mr: 2, color: 'primary.main' }} />
+                              <ListItemText
+                                primary={
+                                  <Typography variant="body2" fontWeight="medium">
+                                    {fileName}
+                                  </Typography>
+                                }
+                                secondary={
+                                  <Typography variant="caption" color="text.secondary">
+                                    {fileType} • {(fileSize / 1024).toFixed(1)} KB
+                                  </Typography>
+                                }
+                                sx={{ flex: 1 }}
+                              />
+                              <Box>
+                                {/* View File Button */}
+                                <Tooltip title="View File Details">
+                                  <IconButton
+                                    size="small"
+                                    onClick={() => handleViewFile(file)}
+                                    color="info"
+                                    sx={{ mr: 1 }}
+                                    disabled={loading}
+                                  >
+                                    <FolderOpenIcon />
+                                  </IconButton>
+                                </Tooltip>
+                                
+                                {/* Edit File Name */}
+                                <Tooltip title="Rename File">
+                                  <IconButton
+                                    size="small"
+                                    onClick={() => {
+                                      const newName = prompt("Enter new file name:", fileName);
+                                      if (newName && newName.trim()) {
+                                        handleEditFileName(index, newName);
+                                      }
+                                    }}
+                                    color="primary"
+                                    sx={{ mr: 1 }}
+                                    disabled={loading}
+                                  >
+                                    <EditIcon />
+                                  </IconButton>
+                                </Tooltip>
+                                
+                                {/* Delete File */}
+                                <Tooltip title="Delete File">
+                                  <IconButton
+                                    size="small"
+                                    onClick={() => handleDeleteFile(index)}
+                                    color="error"
+                                    disabled={loading}
+                                  >
+                                    <DeleteIcon />
+                                  </IconButton>
+                                </Tooltip>
+                              </Box>
+                            </Box>
+                          </ListItem>
+                        );
+                      })}
+                    </List>
+                  </Box>
+                )}
+              </Box>
+            </Box>
+          )}
+        </DialogContent>
+
+        <DialogActions sx={{ px: 3, py: 2 }}>
+          <Button 
+            onClick={handleCloseDialog} 
+            variant="outlined"
+            startIcon={<CancelIcon />}
+            disabled={loading}
+          >
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleSaveCheckpoint} 
+            variant="contained" 
+            color="success"
+            disabled={!selectedCheckpoint || editTodos.length === 0 || !editCheckpoint.trim() || !editDate || loading}
+            startIcon={loading ? null : <SaveIcon />}
+          >
+            {loading ? 'Saving...' : 'Save Changes'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* File View Dialog */}
+      <Dialog 
+        open={viewFileDialogOpen} 
+        onClose={() => setViewFileDialogOpen(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>
+          <Box display="flex" alignItems="center" gap={1}>
+            <FileIcon color="primary" />
+            <Typography variant="h6">File Details</Typography>
+          </Box>
+        </DialogTitle>
+        
+        <DialogContent dividers sx={{ p: 3 }}>
+          {selectedFile ? (
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <Box>
+                <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                  File Name
+                </Typography>
+                <Typography variant="body1" fontWeight="medium" sx={{ wordBreak: 'break-all' }}>
+                  {selectedFile.name}
+                </Typography>
+              </Box>
+              
+              <Box>
+                <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                  File Type
+                </Typography>
+                <Typography variant="body1">
+                  {selectedFile.type}
+                </Typography>
+              </Box>
+              
+              <Box>
+                <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                  File Size
+                </Typography>
+                <Typography variant="body1">
+                  {(selectedFile.size / 1024).toFixed(2)} KB
+                </Typography>
+              </Box>
+            </Box>
+          ) : (
+            <Alert severity="info">
+              No file selected
+            </Alert>
+          )}
+        </DialogContent>
+        
+        <DialogActions>
+          <Button onClick={() => setViewFileDialogOpen(false)}>
+            Close
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </>
+  );
+}
+---------------------------------------------------------------

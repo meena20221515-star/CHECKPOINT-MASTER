@@ -1,0 +1,1031 @@
+CLIENTMASTER3
+
+TABLE
+import React, { useState } from "react";
+import {
+  Box,
+  TextField,
+  IconButton,
+  InputAdornment,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Paper,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Button,
+  Typography,
+  Alert,
+  Chip,
+  List,
+  ListItem,
+  ListItemText
+} from "@mui/material";
+import SearchIcon from "@mui/icons-material/Search";
+import VisibilityIcon from "@mui/icons-material/Visibility";
+import EditIcon from "@mui/icons-material/Edit";
+import DeleteIcon from "@mui/icons-material/Delete";
+import AddIcon from "@mui/icons-material/Add";
+import SaveIcon from "@mui/icons-material/Save";
+import CancelIcon from "@mui/icons-material/Cancel";
+import axios from "axios";
+
+export default function ClientTable({ clients, refresh }) {
+  const [searchTerm, setSearchTerm] = useState("");
+  const [viewDialog, setViewDialog] = useState(false);
+  const [editDialog, setEditDialog] = useState(false);
+  const [selectedClient, setSelectedClient] = useState(null);
+  const [message, setMessage] = useState("");
+
+  // Edit states
+  const [editName, setEditName] = useState("");
+  const [editTodosList, setEditTodosList] = useState([]);
+  const [editTodoInput, setEditTodoInput] = useState("");
+  const [editEditingIndex, setEditEditingIndex] = useState(-1);
+
+  // Parse todo string to array (maintains order)
+  const formatTodosForDisplay = (todoString) => {
+    if (!todoString) return [];
+    return todoString.split(",").map(item => item.trim()).filter(Boolean);
+  };
+
+  const filteredClients = clients.filter(c =>
+    c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    c.todo.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  // View client details
+  const handleView = (client) => {
+    setSelectedClient(client);
+    setViewDialog(true);
+  };
+
+  // Edit client - Load data properly
+  const handleEdit = (client) => {
+    setSelectedClient(client);
+    setEditName(client.name);
+    
+    // Parse the todo string into array
+    const todosArray = formatTodosForDisplay(client.todo);
+    setEditTodosList(todosArray);
+    
+    setEditTodoInput("");
+    setEditEditingIndex(-1);
+    setMessage("");
+    setEditDialog(true);
+  };
+
+  // Todo functions for edit dialog
+  const startEditTodo = (index) => {
+    if (index >= 0 && index < editTodosList.length) {
+      setEditEditingIndex(index);
+      setEditTodoInput(editTodosList[index]);
+    }
+  };
+
+  const addNewTodo = () => {
+    if (!editTodoInput.trim()) {
+      setMessage("Please enter todo text!");
+      return;
+    }
+    
+    const newTodo = editTodoInput.trim();
+    setEditTodosList(prev => [...prev, newTodo]);
+    setEditTodoInput("");
+    setEditEditingIndex(-1);
+    setMessage(`Added: "${newTodo}"`);
+  };
+
+  const saveEditedTodo = () => {
+    if (!editTodoInput.trim() || editEditingIndex < 0) {
+      setMessage("Please enter todo text to save!");
+      return;
+    }
+    
+    const editedTodo = editTodoInput.trim();
+    setEditTodosList(prev => {
+      const updated = [...prev];
+      updated[editEditingIndex] = editedTodo;
+      return updated;
+    });
+    
+    setEditTodoInput("");
+    setEditEditingIndex(-1);
+    setMessage(`Updated todo #${editEditingIndex + 1}`);
+  };
+
+  const cancelEditTodo = () => {
+    setEditEditingIndex(-1);
+    setEditTodoInput("");
+    setMessage("Edit cancelled");
+  };
+
+  const deleteTodo = (index) => {
+    if (window.confirm(`Delete todo #${index + 1}: "${editTodosList[index]}"?`)) {
+      setEditTodosList(prev => prev.filter((_, i) => i !== index));
+      
+      if (index === editEditingIndex) {
+        setEditEditingIndex(-1);
+        setEditTodoInput("");
+      }
+      
+      setMessage(`Deleted todo #${index + 1}`);
+    }
+  };
+
+  // Update client
+  const handleUpdate = async () => {
+    if (!editName.trim()) {
+      setMessage("Client name required!");
+      return;
+    }
+    
+    if (editTodosList.length === 0) {
+      setMessage("At least one todo required!");
+      return;
+    }
+
+    try {
+      setMessage("Saving...");
+      
+      // Save in exact order
+      const todoString = editTodosList.join(", ");
+      
+      await axios.put(
+        `http://localhost:5000/api/clients/${selectedClient._id}`,
+        {
+          name: editName.trim(),
+          todo: todoString
+        }
+      );
+      
+      setEditDialog(false);
+      setMessage("");
+      refresh();
+      
+    } catch (err) {
+      console.error("Save error:", err);
+      setMessage("Error saving. Please try again.");
+    }
+  };
+
+  // Delete client
+  const handleDelete = async (id) => {
+    if (!window.confirm("Delete this client?")) return;
+    
+    try {
+      await axios.delete(`http://localhost:5000/api/clients/${id}`);
+      refresh();
+      setMessage("Client deleted");
+    } catch (err) {
+      setMessage("Error deleting client");
+    }
+  };
+
+  return (
+    <Box>
+      {/* Search */}
+      <TextField
+        fullWidth
+        size="small"
+        placeholder="Search clients..."
+        value={searchTerm}
+        onChange={(e) => setSearchTerm(e.target.value)}
+        InputProps={{
+          startAdornment: (
+            <InputAdornment position="start">
+              <SearchIcon />
+            </InputAdornment>
+          )
+        }}
+        sx={{ mb: 2 }}
+      />
+
+      {/* Message */}
+      {message && (
+        <Alert severity="info" sx={{ mb: 2 }} onClose={() => setMessage("")}>
+          {message}
+        </Alert>
+      )}
+
+      {/* Table */}
+      <TableContainer component={Paper}>
+        <Table>
+          <TableHead sx={{ backgroundColor: "#f5f5f5" }}>
+            <TableRow>
+              <TableCell><strong>S.No</strong></TableCell>
+              <TableCell><strong>Name</strong></TableCell>
+              <TableCell><strong>Todo</strong></TableCell>
+              <TableCell align="center"><strong>Actions</strong></TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {filteredClients.map((client, index) => {
+              const todosArray = formatTodosForDisplay(client.todo);
+              
+              return (
+                <TableRow key={client._id} hover>
+                  <TableCell>{index + 1}</TableCell>
+                  <TableCell>{client.name}</TableCell>
+                  <TableCell>
+                    {todosArray.map((todo, todoIndex) => (
+                      <Box key={todoIndex} display="flex" alignItems="center" mb={0.5}>
+                        <Chip 
+                          label={todoIndex + 1}
+                          size="small" 
+                          sx={{ 
+                            mr: 1, 
+                            backgroundColor: "#1976d2",
+                            color: "white",
+                            fontWeight: "bold"
+                          }}
+                        />
+                        <Typography variant="body2">{todo}</Typography>
+                      </Box>
+                    ))}
+                  </TableCell>
+                  <TableCell align="center">
+                    <IconButton onClick={() => handleView(client)} color="primary" size="small">
+                      <VisibilityIcon />
+                    </IconButton>
+                    <IconButton onClick={() => handleEdit(client)} color="warning" size="small">
+                      <EditIcon />
+                    </IconButton>
+                    <IconButton onClick={() => handleDelete(client._id)} color="error" size="small">
+                      <DeleteIcon />
+                    </IconButton>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+      </TableContainer>
+
+      {/* View Dialog */}
+      <Dialog open={viewDialog} onClose={() => setViewDialog(false)} maxWidth="sm">
+        <DialogTitle>Client Details</DialogTitle>
+        <DialogContent>
+          {selectedClient && (
+            <Box>
+              <Typography variant="h6" gutterBottom color="primary">
+                {selectedClient.name}
+              </Typography>
+              <Typography variant="subtitle1" gutterBottom fontWeight="bold">
+                Todos:
+              </Typography>
+              {formatTodosForDisplay(selectedClient.todo).map((todo, index) => (
+                <Box key={index} display="flex" alignItems="center" mb={1}>
+                  <Chip 
+                    label={index + 1}
+                    size="small" 
+                    sx={{ 
+                      mr: 2,
+                      backgroundColor: "#1976d2",
+                      color: "white",
+                      fontWeight: "bold"
+                    }}
+                  />
+                  <Typography>{todo}</Typography>
+                </Box>
+              ))}
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setViewDialog(false)}>Close</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Edit Dialog - SEPARATE Todo and Todo List Sections */}
+      <Dialog 
+        open={editDialog} 
+        onClose={() => setEditDialog(false)} 
+        maxWidth="md" 
+        fullWidth
+        PaperProps={{ sx: { maxHeight: '80vh' } }}
+      >
+        <DialogTitle>Edit Client</DialogTitle>
+        <DialogContent dividers>
+          {/* Section 1: Client Name */}
+          <Box mb={3}>
+            <Typography variant="subtitle2" gutterBottom fontWeight="bold">
+              Client Name *
+            </Typography>
+            <TextField
+              fullWidth
+              size="small"
+              value={editName}
+              onChange={(e) => setEditName(e.target.value)}
+              placeholder="Enter client name"
+            />
+          </Box>
+
+          {/* Section 2: Add/Edit Todo Input */}
+          <Box mb={3}>
+            <Typography variant="subtitle2" gutterBottom fontWeight="bold">
+              Todo *
+            </Typography>
+            <Box display="flex" gap={1} alignItems="center">
+              <TextField
+                fullWidth
+                size="small"
+                placeholder={
+                  editEditingIndex >= 0 
+                    ? `Editing todo #${editEditingIndex + 1}`
+                    : "Enter new todo"
+                }
+                value={editTodoInput}
+                onChange={(e) => setEditTodoInput(e.target.value)}
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter') {
+                    editEditingIndex >= 0 ? saveEditedTodo() : addNewTodo();
+                  }
+                }}
+                autoFocus
+              />
+              {editEditingIndex >= 0 ? (
+                <Box display="flex" gap={1}>
+                  <Button
+                    variant="contained"
+                    color="success"
+                    onClick={saveEditedTodo}
+                    disabled={!editTodoInput.trim()}
+                    startIcon={<SaveIcon />}
+                    size="small"
+                  >
+                    Save
+                  </Button>
+                  <Button
+                    variant="outlined"
+                    onClick={cancelEditTodo}
+                    startIcon={<CancelIcon />}
+                    size="small"
+                  >
+                    Cancel
+                  </Button>
+                </Box>
+              ) : (
+                <Button
+                  variant="contained"
+                  onClick={addNewTodo}
+                  disabled={!editTodoInput.trim()}
+                  startIcon={<AddIcon />}
+                  size="small"
+                >
+                  Add
+                </Button>
+              )}
+            </Box>
+          </Box>
+
+          {/* Section 3: Todo List Display (Separate Section) */}
+          <Box>
+            <Typography variant="subtitle2" gutterBottom fontWeight="bold">
+              Todo List ({editTodosList.length} items)
+            </Typography>
+            
+            {editTodosList.length === 0 ? (
+              <Alert severity="info">
+                No todos added yet. Add your first todo above.
+              </Alert>
+            ) : (
+              <Paper 
+                variant="outlined" 
+                sx={{ 
+                  maxHeight: 300, 
+                  overflow: 'auto',
+                  p: 2
+                }}
+              >
+                <List dense>
+                  {editTodosList.map((todo, index) => (
+                    <ListItem 
+                      key={index}
+                      sx={{ 
+                        borderBottom: index < editTodosList.length - 1 ? '1px solid #f0f0f0' : 'none',
+                        bgcolor: index === editEditingIndex ? '#fff8e1' : 'transparent',
+                        py: 1.5
+                      }}
+                    >
+                      <Box sx={{ display: 'flex', alignItems: 'center', width: '100%' }}>
+                        {/* Todo Number */}
+                        <Chip 
+                          label={index + 1}
+                          size="small" 
+                          sx={{ 
+                            mr: 2,
+                            backgroundColor: index === editEditingIndex ? "#ff9800" : "#1976d2",
+                            color: "white",
+                            fontWeight: "bold",
+                            minWidth: 40,
+                            height: 32
+                          }}
+                        />
+                        
+                        {/* Todo Text */}
+                        <ListItemText 
+                          primary={
+                            <Typography sx={{ flex: 1 }}>{todo}</Typography>
+                          }
+                        />
+                        
+                        {/* Action Buttons - INSIDE Todo List */}
+                        <Box sx={{ display: 'flex', gap: 1 }}>
+                          <IconButton
+                            size="small"
+                            onClick={() => startEditTodo(index)}
+                            color="primary"
+                            sx={{ 
+                              border: '1px solid #1976d2',
+                              '&:hover': { backgroundColor: '#e3f2fd' }
+                            }}
+                            title="Edit this todo"
+                          >
+                            <EditIcon fontSize="small" />
+                          </IconButton>
+                          <IconButton
+                            size="small"
+                            onClick={() => deleteTodo(index)}
+                            color="error"
+                            sx={{ 
+                              border: '1px solid #f44336',
+                              '&:hover': { backgroundColor: '#ffebee' }
+                            }}
+                            title="Delete this todo"
+                          >
+                            <DeleteIcon fontSize="small" />
+                          </IconButton>
+                        </Box>
+                      </Box>
+                    </ListItem>
+                  ))}
+                </List>
+              </Paper>
+            )}
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setEditDialog(false)} variant="outlined">
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleUpdate} 
+            variant="contained" 
+            color="success"
+            disabled={editTodosList.length === 0 || !editName.trim()}
+            startIcon={<SaveIcon />}
+          >
+            Update Client
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </Box>
+  );
+}
+------------------------------------------
+FORM
+ import React, { useState } from "react";
+import {
+  Box,
+  TextField,
+  Button,
+  Stack,
+  IconButton,
+  Typography,
+  Grid,
+  Paper,
+  Chip
+} from "@mui/material";
+import SaveIcon from "@mui/icons-material/Save";
+import ClearIcon from "@mui/icons-material/Clear";
+import AddIcon from "@mui/icons-material/Add";
+import DeleteIcon from "@mui/icons-material/Delete";
+import EditIcon from "@mui/icons-material/Edit";
+import CheckIcon from "@mui/icons-material/Check";
+import CancelIcon from "@mui/icons-material/Cancel";
+import axios from "axios";
+
+export default function ClientForm({ refresh }) {
+  const [name, setName] = useState("");
+  const [todoInput, setTodoInput] = useState("");
+  const [todos, setTodos] = useState([]);
+  const [editingIndex, setEditingIndex] = useState(-1);
+  const [editingText, setEditingText] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
+
+  const addTodo = () => {
+    if (todoInput.trim()) {
+      setTodos([...todos, todoInput.trim()]);
+      setTodoInput("");
+    }
+  };
+
+  const startEditTodo = (index) => {
+    setEditingIndex(index);
+    setEditingText(todos[index]);
+  };
+
+  const saveEditTodo = () => {
+    if (editingText.trim()) {
+      const updatedTodos = [...todos];
+      updatedTodos[editingIndex] = editingText.trim();
+      setTodos(updatedTodos);
+      setEditingIndex(-1);
+      setEditingText("");
+    }
+  };
+
+  const cancelEditTodo = () => {
+    setEditingIndex(-1);
+    setEditingText("");
+  };
+
+  const deleteTodo = (index) => {
+    const updatedTodos = todos.filter((_, i) => i !== index);
+    setTodos(updatedTodos);
+    if (editingIndex === index) {
+      setEditingIndex(-1);
+      setEditingText("");
+    } else if (editingIndex > index) {
+      setEditingIndex(editingIndex - 1);
+    }
+  };
+
+  const handleSave = async () => {
+    if (!name.trim()) {
+      alert("Please enter client name");
+      return;
+    }
+    if (todos.length === 0) {
+      alert("Please add at least one todo");
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      // Join todos in exact order (1, 2, 3...)
+      const todoString = todos.join(", ");
+      
+      console.log("Saving:", {
+        name: name.trim(),
+        todos: todos.map((t, i) => `${i+1}. ${t}`),
+        todoString: todoString
+      });
+      
+      await axios.post("http://localhost:5000/api/clients", {
+        name: name.trim(),
+        todo: todoString
+      });
+
+      // Reset form
+      setName("");
+      setTodos([]);
+      setTodoInput("");
+      setEditingIndex(-1);
+      setEditingText("");
+      
+      // Refresh table
+      if (refresh) {
+        refresh();
+      }
+      
+      alert("Client saved successfully!");
+    } catch (err) {
+      console.error("Save error:", err);
+      alert("Error saving client");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleClear = () => {
+    setName("");
+    setTodos([]);
+    setTodoInput("");
+    setEditingIndex(-1);
+    setEditingText("");
+  };
+
+  const handleKeyPress = (e) => {
+    if (e.key === "Enter") {
+      addTodo();
+    }
+  };
+
+  const handleEditKeyPress = (e) => {
+    if (e.key === "Enter") {
+      saveEditTodo();
+    } else if (e.key === "Escape") {
+      cancelEditTodo();
+    }
+  };
+
+  return (
+    <Paper 
+      sx={{ 
+        border: '1px solid #e0e0e0',
+        borderRadius: '4px',
+        padding: "20px",
+        backgroundColor: "#fff",
+        marginBottom: "20px"
+      }}
+    >
+      <Grid container spacing={3}>
+        {/* Left Column - Form */}
+        <Grid item xs={12} md={6}>
+          <Stack spacing={2}>
+            <Box>
+              <Typography 
+                variant="subtitle2" 
+                sx={{ 
+                  marginBottom: "8px",
+                  color: "#333",
+                  fontWeight: "bold"
+                }}
+              >
+                Name *
+              </Typography>
+              <TextField
+                placeholder="Enter client name"
+                size="small"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                fullWidth
+              />
+            </Box>
+
+            <Box>
+              <Typography 
+                variant="subtitle2" 
+                sx={{ 
+                  marginBottom: "8px",
+                  color: "#333",
+                  fontWeight: "bold"
+                }}
+              >
+                Todo *
+              </Typography>
+              <Stack direction="row" spacing={1}>
+                <TextField
+                  placeholder="Enter todo"
+                  size="small"
+                  value={todoInput}
+                  onChange={(e) => setTodoInput(e.target.value)}
+                  onKeyPress={handleKeyPress}
+                  fullWidth
+                />
+                <Button
+                  variant="contained"
+                  onClick={addTodo}
+                  disabled={!todoInput.trim()}
+                  sx={{ minWidth: "40px" }}
+                >
+                  <AddIcon />
+                </Button>
+              </Stack>
+            </Box>
+
+            <Box sx={{ marginTop: "10px" }}>
+              <Stack direction="row" spacing={2}>
+                <Button
+                  variant="contained"
+                  startIcon={<SaveIcon />}
+                  onClick={handleSave}
+                  disabled={!name.trim() || todos.length === 0 || isSaving}
+                  sx={{ backgroundColor: "#4CAF50" }}
+                >
+                  {isSaving ? "Saving..." : "Save"}
+                </Button>
+                <Button
+                  variant="contained"
+                  startIcon={<ClearIcon />}
+                  onClick={handleClear}
+                  sx={{ backgroundColor: "#f44336" }}
+                >
+                  Clear
+                </Button>
+              </Stack>
+            </Box>
+          </Stack>
+        </Grid>
+
+        {/* Right Column - Todo Preview */}
+        <Grid item xs={12} md={6}>
+          <Box>
+            <Box
+              sx={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: "15px"
+              }}
+            >
+              <Typography
+                variant="subtitle1"
+                sx={{ fontWeight: "bold", color: "#333" }}
+              >
+                Todo Preview
+              </Typography>
+              <Chip
+                label={`${todos.length} item${todos.length !== 1 ? 's' : ''}`}
+                size="small"
+              />
+            </Box>
+            
+            {todos.length === 0 ? (
+              <Typography
+                sx={{ color: "#999", fontStyle: "italic", textAlign: "center" }}
+              >
+                No todos added yet
+              </Typography>
+            ) : (
+              <Box sx={{ maxHeight: "200px", overflowY: "auto" }}>
+                {todos.map((todo, index) => (
+                  editingIndex === index ? (
+                    // Edit Mode
+                    <Box
+                      key={index}
+                      sx={{
+                        display: "flex",
+                        alignItems: "center",
+                        marginBottom: "8px",
+                        padding: "8px",
+                        border: "2px solid #1976d2",
+                        borderRadius: "4px"
+                      }}
+                    >
+                      <Chip
+                        label={index + 1}
+                        size="small"
+                        sx={{ marginRight: "10px", backgroundColor: "#1976d2" }}
+                      />
+                      <TextField
+                        value={editingText}
+                        onChange={(e) => setEditingText(e.target.value)}
+                        onKeyPress={handleEditKeyPress}
+                        size="small"
+                        fullWidth
+                        autoFocus
+                      />
+                      <IconButton
+                        size="small"
+                        onClick={saveEditTodo}
+                        disabled={!editingText.trim()}
+                        sx={{ color: "#4CAF50", marginLeft: "5px" }}
+                      >
+                        <CheckIcon />
+                      </IconButton>
+                      <IconButton
+                        size="small"
+                        onClick={cancelEditTodo}
+                        sx={{ color: "#f44336" }}
+                      >
+                        <CancelIcon />
+                      </IconButton>
+                    </Box>
+                  ) : (
+                    // View Mode
+                    <Box
+                      key={index}
+                      sx={{
+                        display: "flex",
+                        alignItems: "center",
+                        marginBottom: "8px",
+                        padding: "8px",
+                        border: "1px solid #e0e0e0",
+                        borderRadius: "4px"
+                      }}
+                    >
+                      <Chip
+                        label={index + 1}
+                        size="small"
+                        sx={{ marginRight: "10px" }}
+                      />
+                      <Typography sx={{ flexGrow: 1 }}>{todo}</Typography>
+                      <IconButton
+                        size="small"
+                        onClick={() => startEditTodo(index)}
+                        sx={{ color: "#1976d2" }}
+                      >
+                        <EditIcon />
+                      </IconButton>
+                      <IconButton
+                        size="small"
+                        onClick={() => deleteTodo(index)}
+                        sx={{ color: "#f44336" }}
+                      >
+                        <DeleteIcon />
+                      </IconButton>
+                    </Box>
+                  )
+                ))}
+              </Box>
+            )}
+          </Box>
+        </Grid>
+      </Grid>
+    </Paper>
+  );
+}
+-----------------------------------------------------------------
+CLIENT CONTROLLER
+const Client = require("../models/Client");
+
+exports.getClients = async (req, res) => {
+  try {
+    const clients = await Client.find().sort({ createdAt: 1 });
+    res.status(200).json(clients);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+exports.createClient = async (req, res) => {
+  try {
+    const client = new Client(req.body);
+    const saved = await client.save();
+    res.status(201).json(saved);
+  } catch (err) {
+    res.status(400).json({ message: err.message });
+  }
+};
+
+exports.updateClient = async (req, res) => {
+  try {
+    const updated = await Client.findByIdAndUpdate(
+      req.params.id,
+      req.body,
+      { new: true }
+    );
+    res.json(updated);
+  } catch (err) {
+    res.status(400).json({ message: err.message });
+  }
+};
+
+exports.deleteClient = async (req, res) => {
+  try {
+    await Client.findByIdAndDelete(req.params.id);
+    res.json({ message: "Deleted successfully" });
+  } catch (err) {
+    res.status(400).json({ message: err.message });
+  }
+};
+---------------------------------------------------
+DB.JS
+const mongoose = require("mongoose");
+
+const connectDB = async () => {
+  try {
+    await mongoose.connect("mongodb://127.0.0.1:27017/clientdb", {
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+    });
+    console.log("✅ MongoDB Connected");
+  } catch (error) {
+    console.error("❌ MongoDB Error:", error);
+    process.exit(1);
+  }
+};
+
+module.exports = connectDB;
+----------------------------------------------------
+ADDCLIENT
+import React, { useState } from 'react';
+import { 
+  Container, 
+  Typography, 
+  Button, 
+  Box, 
+  TextField,
+  Alert
+  // Removed: Snackbar
+} from '@mui/material';
+import { useNavigate } from 'react-router-dom';
+import axios from 'axios';
+
+export default function AddClient() {
+  const [name, setName] = useState('');
+  const [todo, setTodo] = useState('');
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  const navigate = useNavigate();
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    
+    if (!name.trim()) {
+      setError('Client name is required');
+      return;
+    }
+
+    try {
+      await axios.post('http://localhost:5000/api/clients', {
+        name: name.trim(),
+        todo: todo.trim()
+      });
+      
+      setSuccess('Client added successfully!');
+      setTimeout(() => {
+        navigate('/');
+      }, 1500);
+      
+    } catch (err) {
+      console.error('Error adding client:', err);
+      setError(err.response?.data?.message || 'Failed to add client');
+    }
+  };
+
+  return (
+    <Container maxWidth="sm" sx={{ mt: 4 }}>
+      <Typography variant="h4" gutterBottom>
+        Add New Client
+      </Typography>
+      
+      {/* Error Alert */}
+      {error && (
+        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>
+          {error}
+        </Alert>
+      )}
+      
+      {/* Success Alert */}
+      {success && (
+        <Alert severity="success" sx={{ mb: 2 }}>
+          {success}
+        </Alert>
+      )}
+      
+      <Box component="form" onSubmit={handleSubmit}>
+        <Box mb={3}>
+          <TextField
+            label="Client Name *"
+            fullWidth
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            required
+            error={!name.trim() && name !== ''}
+            helperText={!name.trim() && name !== '' ? "Name is required" : ""}
+          />
+        </Box>
+        
+        <Box mb={3}>
+          <TextField
+            label="Todo (comma-separated)"
+            fullWidth
+            multiline
+            rows={3}
+            value={todo}
+            onChange={(e) => setTodo(e.target.value)}
+            placeholder="Enter todos separated by commas (e.g., Design logo, Develop website, Test features)"
+          />
+        </Box>
+        
+        <Box display="flex" gap={2}>
+          <Button type="submit" variant="contained" color="primary">
+            Add Client
+          </Button>
+          <Button variant="outlined" onClick={() => navigate('/')}>
+            Cancel
+          </Button>
+        </Box>
+      </Box>
+    </Container>
+  );
+}
+--------------------------------------------------------
+SERVER.JS 
+const express = require("express");
+const mongoose = require("mongoose");
+const cors = require("cors");
+
+const app = express();
+
+app.use(cors());
+app.use(express.json());
+
+mongoose.connect("mongodb://127.0.0.1:27017/clientdb")
+  .then(() => console.log("MongoDB connected"))
+  .catch(err => console.log(err));
+
+app.use("/api/clients", require("./routes/clientRoutes"));
+
+app.listen(5000, () => {
+  console.log("Server running on port 5000");
+});
+-----------------------------------------
+
+         1. Inline Editing in Todo List:
+When you click the edit icon on a todo item, it transforms into an editable text field within the same list
+
+No more popup/prompt dialog for editing
+
+Edit happens directly in place
+
+-----------------------------------------------------------

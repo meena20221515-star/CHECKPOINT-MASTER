@@ -1,0 +1,43 @@
+{
+  "dependencies": {
+    "@mui/icons-material": "^7.3.6",
+    "@mui/material": "^7.3.6",
+    "@mui/x-data-grid": "^8.23.0"
+  }
+}
+
+
+
+correct cgm
+import { Container, Typography } from "@mui/material";
+import { useEffect, useState } from "react";
+import axios from "axios";
+import ClientForm from "../components/ClientForm";
+import ClientTable from "../components/ClientTable";
+import SearchBar from "../components/SearchBar";
+
+export default function ClientGroupingMaster() {
+  const [rows, setRows] = useState([]);
+  const [search, setSearch] = useState("");
+
+  useEffect(() => {
+    axios.get("http://localhost:5000/api/clients")
+      .then(r => setRows(r.data));
+  }, []);
+
+  const filtered = rows.filter(r =>
+    r.clientName.toLowerCase().includes(search.toLowerCase()) ||
+    r.task.toLowerCase().includes(search.toLowerCase())
+  );
+
+  return (
+    <Container>
+      <Typography variant="h4" align="center" my={3} color="primary">
+        Client Grouping Master
+      </Typography>
+      <ClientForm onSubmit={r => setRows(p => [...p, r])} />
+      <SearchBar search={search} setSearch={setSearch} />
+      <ClientTable rows={filtered} setRows={setRows} />
+    </Container>
+  );
+}
